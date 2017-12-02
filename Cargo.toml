@@ -1,7 +1,7 @@
 [package]
-name = "tokio-socks5"
+name = "uservpn-socks5"
 version = "0.1.0"
-authors = ["Alex Crichton <alex@alexcrichton.com>"]
+authors = ["Jochen Kiemes <jochen@kiemes.de>"]
 
 [dependencies]
 log = "0.3"
