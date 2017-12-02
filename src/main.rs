@@ -66,24 +66,36 @@ use trust_dns::op::{Message, ResponseCode};
 use trust_dns::rr::{DNSClass, Name, RData, RecordType};
 use trust_dns::udp::UdpClientStream;
 
-
 fn main() {
     drop(env_logger::init());
 
     let matches = clap_app!(uservpn_socks5 =>
-        (version: "0.1.0")
+        (version: crate_version!())
         (author: "Jochen Kiemes <jochen@kiemes.de>")
         (about: "Multi-server multi-client vpn")
         (@arg CONFIG: -c --config +takes_value "Sets a custom config file")
         (@arg debug: -d ... "Sets the level of debugging information")
-        (@arg socks: -l --listen +takes_value ... "Listening address of socks-server <address:port>")
+        (@arg socks: -l --listen +takes_value "Listening address of socks-server <ip:port>")
+        (@arg peers: -p --peers +takes_value " List of known peer servers <ip:port,...>")
+        (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
 
-    // Take the first command line argument as an address to listen on, or fall
-    // back to just some localhost default.
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
-    // let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
+
+    let peers = matches.value_of("peers").unwrap_or("");
+    let peers = peers.split(",")
+                     .collect::<Vec<&str>>();
+    let mut peer_list: Vec<SocketAddr> = Vec::new();
+    for ad in peers {
+        let a  = ad.clone();
+        let ad = ad.parse::<SocketAddr>();
+        match ad {
+            Ok(x)  => peer_list.push(x),
+            Err(x) => println!("Ignore peer <{}> => {}",a,x),
+        }
+    }
+    println!("{:?}",peer_list);
 
     // Initialize the various data structures we're going to use in our server.
     // Here we create the event loop, the global buffer that all threads will
