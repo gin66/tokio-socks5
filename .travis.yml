@@ -18,11 +18,18 @@ os:
 - linux
 - osx
 
+before_deploy:
+    - ls -alR
+    - echo $(TRAVIS_OS_NAME)
+    - export FILENAME=tokio-socks5-$(TRAVIS_OS_NAME)
+    - mv target/release/tokio-socks5 $(FILENAME)
+
 deploy:
   provider: releases
+  skip_cleanup: true
   api_key:
     secure: CC45TdB6brzcYeCJFOcB+KVZRSuKBooKAja/m1Y3sft5JFQDiunZG3MrAhXmjeyaA3JCDrQyUG4mPtZ9uBq9/cWtagAOgu2agYqwY6GIZUes5Ko1VxnHoiQzz6A+jyb877KlBpbuIjgtXFguJxjCqsdNe7G9OOATvnAcxzOypG2QGykBAgq8xggFjGMSGRWOoYMvXD32zP/7kAqjV1UxjCfQl7um1quciqWsCoByI6KEh49PnS0TpivNTZQajuI83YUaPB/J19pmtlcYEE/tC4fRCPDV3cqgGmF2xE5es0RZrh2qNLQlK1Ky55GMpnYMpg2Ps+f8JTPUfNdQ68hu1Wxtgv14WPpZilRNXRmfYC7pb/NyYlCJan4abDacV12lhPEtyf20MC7fXsgfkfg5L70ZSnkGVCMMG7ubcFf+EVNddfESWLs5ekz31NJZbJ4pjcOPDBQBPvLofwBsU64JAzW1MhRTCaXZg9AR5nyhk4ywLSkHzeHAW2tNoUGHlbnROWSDYSFy/FWgQ5Ph97xR8PF5/eNnBeCfyH6xGp4+TvAYuQ1vbUrA5c8SKLrxIWQFVrWBq4SbuFtiOP6Dbl8Ub8VrZG2pHW3clXYloPMdP48kugHRDv10Yu73OPP9Gj2P9jKmiuLtOIfYCx4fGrlmxFmg52oh+fMt+HapiOgP960=
-  file: /home/travis/build/gin66/uservpn-socks5/target/release/tokio-socks5
+  file: $(FILENAME)
   on:
     repo: gin66/uservpn-socks5
     branch: mba
