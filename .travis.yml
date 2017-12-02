@@ -6,8 +6,8 @@ rust:
     # - nightly
 sudo: false
 script:
-  - cargo build
   - cargo test
+  - cargo build --release
 notifications:
   email:
     on_success: never
@@ -16,8 +16,8 @@ os:
   - osx
 
 deploy:
-  provider: pages
-  skip_cleanup: true
+  provider: releases
+  file: target/release/tokio-socks5
   github_token: $GITHUB_TOKEN # Set in travis-ci.org dashboard
   on:
     branch: mba
