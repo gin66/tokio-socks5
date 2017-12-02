@@ -74,28 +74,39 @@ fn main() {
         (author: "Jochen Kiemes <jochen@kiemes.de>")
         (about: "Multi-server multi-client vpn")
         (@arg CONFIG: -c --config +takes_value "Sets a custom config file")
-        (@arg debug: -d ... "Sets the level of debugging information")
-        (@arg socks: -l --listen +takes_value "Listening address of socks-server <ip:port>")
-        (@arg peers: -p --peers +takes_value " List of known peer servers <ip:port,...>")
+        (@arg debug:  -d ... "Sets the level of debugging information")
+        (@arg socks:  -s --socks  +takes_value "Listening address of socks-server <ip:port>")
+        (@arg listen: -l --listen +takes_value "Listening addresses for peers <ip:port,...>")
+        (@arg peers:  -p --peers  +takes_value "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
 
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();
 
-    let peers = matches.value_of("peers").unwrap_or("");
-    let peers = peers.split(",")
-                     .collect::<Vec<&str>>();
     let mut peer_list: Vec<SocketAddr> = Vec::new();
-    for ad in peers {
-        let a  = ad.clone();
-        let ad = ad.parse::<SocketAddr>();
-        match ad {
-            Ok(x)  => peer_list.push(x),
-            Err(x) => println!("Ignore peer <{}> => {}",a,x),
+    if let Some(peers) = matches.value_of("peers") {
+        for ad in peers.split(",") {
+            let a = ad.clone();
+            match ad.parse::<SocketAddr>() {
+                Ok(x)  => peer_list.push(x),
+                Err(x) => println!("Ignore peer <{}> => {}",a,x),
+            }
         }
     }
-    println!("{:?}",peer_list);
+    info!("{:?}",peer_list);
+
+    let mut listen_list: Vec<SocketAddr> = Vec::new();
+    if let Some(listen) = matches.value_of("listen") {
+        for ad in listen.split(",") {
+            let a = ad.clone();
+            match ad.parse::<SocketAddr>() {
+                Ok(x)  => listen_list.push(x),
+                Err(x) => println!("Ignore listen address <{}> => {}",a,x),
+            }
+        }
+    }
+    info!("{:?}",listen_list);
 
     // Initialize the various data structures we're going to use in our server.
     // Here we create the event loop, the global buffer that all threads will
