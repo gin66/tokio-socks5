@@ -16,7 +16,7 @@ notifications:
 
 os:
 - linux
-- osx
+  # - osx
 
 before_deploy:
     - echo ${TRAVIS_OS_NAME}
@@ -32,3 +32,4 @@ deploy:
   on:
     repo: gin66/uservpn-socks5
     branch: mba
+    tags: true
