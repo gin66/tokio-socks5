@@ -162,7 +162,7 @@ impl Client {
                 // which represents that this future has immediately failed. In
                 // this case the type of the future is `io::Error`, so we use a
                 // helper function, `other`, to create an error quickly.
-                _ => future::err(other("unknown version")).boxed(),
+                _ => Box::new(future::err(other("unknown version")))
             }
         }))
     }
@@ -170,7 +170,7 @@ impl Client {
     /// Current SOCKSv4 is not implemented, but v5 below has more fun details!
     fn serve_v4(self, _conn: TcpStream)
                 -> Box<Future<Item=(u64, u64), Error=io::Error>> {
-        future::err(other("unimplemented")).boxed()
+        Box::new(future::err(other("unimplemented")))
     }
 
     /// The meat of a SOCKSv5 handshake.
@@ -208,7 +208,7 @@ impl Client {
             } else {
                 Err(other("no supported method given"))
             }
-        }).boxed();
+        });
 
         // After we've concluded that one of the client's supported methods is
         // `METH_NO_AUTH`, we "ack" this to the client by sending back that
@@ -216,7 +216,7 @@ impl Client {
         // works very similarly to the `read_exact` combinator.
         let part1 = authenticated.and_then(|conn| {
             write_all(conn, [v5::VERSION, v5::METH_NO_AUTH])
-        }).boxed();
+        });
 
         // Next up, we get a selected protocol version back from the client, as
         // well as a command indicating what they'd like to do. We just verify
@@ -233,7 +233,7 @@ impl Client {
                     Err(other("didn't confirm with v5 version"))
                 }
             })
-        }).boxed();
+        });
         let command = ack.and_then(|conn| {
             read_exact(conn, [0u8]).and_then(|(conn, buf)| {
                 if buf[0] == v5::CMD_CONNECT {
@@ -242,7 +242,7 @@ impl Client {
                     Err(other("unsupported command"))
                 }
             })
-        }).boxed();
+        });
 
         // After we've negotiated a command, there's one byte which is reserved
         // for future use, so we read it and discard it. The next part of the
