@@ -45,9 +45,10 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate trust_dns;
+#[macro_use]
+extern crate clap;
 
 use std::cell::RefCell;
-use std::env;
 use std::io::{self, Read, Write};
 use std::net::{Shutdown, IpAddr};
 use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
@@ -65,12 +66,23 @@ use trust_dns::op::{Message, ResponseCode};
 use trust_dns::rr::{DNSClass, Name, RData, RecordType};
 use trust_dns::udp::UdpClientStream;
 
+
 fn main() {
     drop(env_logger::init());
 
+    let matches = clap_app!(uservpn_socks5 =>
+        (version: "0.1.0")
+        (author: "Jochen Kiemes <jochen@kiemes.de>")
+        (about: "Multi-server multi-client vpn")
+        (@arg CONFIG: -c --config +takes_value "Sets a custom config file")
+        (@arg debug: -d ... "Sets the level of debugging information")
+        (@arg socks: -l --listen +takes_value ... "Listening address of socks-server <address:port>")
+    ).get_matches();
+
     // Take the first command line argument as an address to listen on, or fall
     // back to just some localhost default.
-    let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
+    let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
+    // let addr = env::args().nth(1).unwrap_or("127.0.0.1:8080".to_string());
     let addr = addr.parse::<SocketAddr>().unwrap();
 
     // Initialize the various data structures we're going to use in our server.
