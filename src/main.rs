@@ -54,13 +54,14 @@ use std::net::{Shutdown, IpAddr};
 use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::rc::Rc;
 use std::str;
-use std::time::Duration;
+use std::time::{Instant,Duration};
+use std::io::ErrorKind::AddrNotAvailable;
 
 use futures::future;
 use futures::{Future, Stream, Poll, Async};
 use tokio_io::io::{read_exact, write_all, Window};
-use tokio_core::net::{TcpStream, TcpListener};
-use tokio_core::reactor::{Core, Handle, Timeout};
+use tokio_core::net::{TcpStream, TcpListener, UdpSocket};
+use tokio_core::reactor::{Core, Handle, Timeout, Interval};
 use trust_dns::client::{ClientFuture, BasicClientHandle, ClientHandle};
 use trust_dns::op::{Message, ResponseCode};
 use trust_dns::rr::{DNSClass, Name, RData, RecordType};
@@ -116,6 +117,29 @@ fn main() {
     let handle = lp.handle();
     let listener = TcpListener::bind(&addr, &handle).unwrap();
 
+    println!("Listening for peer udp connections on {}", &listen_list[0]);
+    let comm_udp = UdpSocket::bind(&listen_list[0],&handle).unwrap();
+
+    let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                  Duration::new(10,0),&handle).unwrap()
+                        .for_each(|_| {
+                            let buf: Vec<u8> = vec![0;10];
+                            for ad in &peer_list {
+                                println!("Send Init to {}",ad);
+                                let res = comm_udp.send_to(&buf,&ad);
+                                match res {
+                                    Ok(n)  => assert!(n == buf.len()),
+                                    Err(e) => {
+                                        match e.kind() {
+                                            AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
+                                            _ => println!("{:?}",e)
+                                        }
+                                    }
+                                };
+                            };
+                            Ok(())
+                        });
+
     // This is the address of the DNS server we'll send queries to. If
     // external servers can't be used in your environment, you can substitue
     // your own.
@@ -153,6 +177,8 @@ fn main() {
         }));
         Ok(())
     });
+
+    let server = server.join(initiator);
 
     // Now that we've got our server as a future ready to go, let's run it!
     //
