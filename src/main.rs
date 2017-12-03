@@ -57,8 +57,8 @@ use std::str;
 use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
 
-use futures::future;
-use futures::{Future, Stream, Poll, Async};
+use futures::{future,Future, Stream, Poll, Async, Sink};
+use futures::stream::{SplitSink,SplitStream};
 use tokio_io::io::{read_exact, write_all, Window};
 use tokio_core::net::{TcpStream, TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Handle, Timeout, Interval};
@@ -67,6 +67,8 @@ use trust_dns::op::{Message, ResponseCode};
 use trust_dns::rr::{DNSClass, Name, RData, RecordType};
 use trust_dns::udp::UdpClientStream;
 
+mod message;
+
 fn main() {
     drop(env_logger::init());
 
@@ -74,11 +76,11 @@ fn main() {
         (version: crate_version!())
         (author: "Jochen Kiemes <jochen@kiemes.de>")
         (about: "Multi-server multi-client vpn")
-        (@arg CONFIG: -c --config +takes_value "Sets a custom config file")
-        (@arg debug:  -d ... "Sets the level of debugging information")
-        (@arg socks:  -s --socks  +takes_value "Listening address of socks-server <ip:port>")
-        (@arg listen: -l --listen +takes_value "Listening addresses for peers <ip:port,...>")
-        (@arg peers:  -p --peers  +takes_value "List of known peer servers <ip:port,...>")
+        (@arg CONFIG: -c --config +takes_value   "Sets a custom config file")
+        (@arg debug:  -d ...                     "Sets the level of debugging information")
+        (@arg socks:  -s --socks  +takes_value   "Listening address of socks-server <ip:port>")
+        (@arg listen: -l --listen +takes_value   "Listening addresses for peers <ip:port,...>")
+        (@arg peers:  -p --peers  +takes_value   "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
 
@@ -117,18 +119,39 @@ fn main() {
     let handle = lp.handle();
     let listener = TcpListener::bind(&addr, &handle).unwrap();
 
-    println!("Listening for peer udp connections on {}", &listen_list[0]);
-    let comm_udp = UdpSocket::bind(&listen_list[0],&handle).unwrap();
+    let my_id = 1;
+    let secret = 1;
+    let mut udp_sinks:   Vec<SplitSink<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
+    let mut udp_streams: Vec<SplitStream<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
+    for ad in listen_list {
+        println!("Listening for peer udp connections on {}", ad);
+        let comm_udp = UdpSocket::bind(&ad,&handle).unwrap();
+        let (udp_sink,udp_stream) = comm_udp.framed(message::MessageCodec {my_id,secret}).split();
+        udp_sinks.push(udp_sink);
+        udp_streams.push(udp_stream);
+    }
 
+    // The duty of the initiator is trying to connect to the peers 
+    // unless connection is established. 
+    // Connect means to send a Hello message with info about self.
+    //
+    // Implementation is a periodic task, which basically should do:
+    //      1. Iterate through the list of static peers.
+    //      2. Check (who) if the peer is already connected
+    //      3. If peer is not connected, initiate sending Hello message
+    //
+    // initiator helds a future to be waited for
     let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
                                   Duration::new(10,0),&handle).unwrap()
                         .for_each(|_| {
-                            let buf: Vec<u8> = vec![0;10];
                             for ad in &peer_list {
                                 println!("Send Init to {}",ad);
-                                let res = comm_udp.send_to(&buf,&ad);
+                                let buf: Vec<u8> = vec![0;10];
+                                let msg = (ad.clone(),buf);
+                                let res = udp_sinks[0].start_send(msg).unwrap();
+                                let res = udp_sinks[0].poll_complete();
                                 match res {
-                                    Ok(n)  => assert!(n == buf.len()),
+                                    Ok(_)  => println!("sent"),
                                     Err(e) => {
                                         match e.kind() {
                                             AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
@@ -136,6 +159,15 @@ fn main() {
                                         }
                                     }
                                 };
+                            };
+                            Ok(())
+                        });
+
+    let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                  Duration::new(1,0),&handle).unwrap()
+                        .for_each(|_| {
+                            for ad in &peer_list {
+                                println!("Send Data to {}",ad);
                             };
                             Ok(())
                         });
@@ -179,6 +211,7 @@ fn main() {
     });
 
     let server = server.join(initiator);
+    let server = server.join(communicator);
 
     // Now that we've got our server as a future ready to go, let's run it!
     //
