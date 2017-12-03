@@ -133,10 +133,25 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
+    // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
+    //
+    // If several udp sockets are available, then use round robin for sending.
+    //
     let (tx, rx): (Sender<(SocketAddr, Vec<u8>)>,Receiver<(SocketAddr, Vec<u8>)>) = mpsc::channel(100);
+    println!("number of listen sockets = {}",udp_sinks.len());
+    let mut counter: Vec<usize> = vec![0];
+    let counter = RefCell::new(counter);
     let udp_sender = rx.for_each(move |msg| {
-        let res = udp_sinks[0].start_send(msg).unwrap();
-        let res = udp_sinks[0].poll_complete();
+        let mut counter = counter.borrow_mut();
+        println!("{:?}",counter);
+        let mut cnt = counter[0];
+        cnt = if cnt == udp_sinks.len()-1 {
+            0
+        } else { cnt + 1 };
+        counter[0] = cnt;
+
+        let res = udp_sinks[cnt].start_send(msg).unwrap();
+        let res = udp_sinks[cnt].poll_complete();
         match res {
             Ok(_)  => println!("sent"),
             Err(e) => {
