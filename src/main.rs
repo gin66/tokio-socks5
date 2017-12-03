@@ -58,6 +58,8 @@ use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
 
 use futures::{future,Future, Stream, Poll, Async, Sink};
+use futures::sync::mpsc;
+use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
 use tokio_io::io::{read_exact, write_all, Window};
 use tokio_core::net::{TcpStream, TcpListener, UdpSocket};
@@ -131,6 +133,24 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
+    let (tx, rx): (Sender<(SocketAddr, Vec<u8>)>,Receiver<(SocketAddr, Vec<u8>)>) = mpsc::channel(100);
+    let udp_sender = rx.for_each(move |msg| {
+        let res = udp_sinks[0].start_send(msg).unwrap();
+        let res = udp_sinks[0].poll_complete();
+        match res {
+            Ok(_)  => println!("sent"),
+            Err(e) => {
+                match e.kind() {
+                    AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
+                    _ => println!("{:?}",e)
+                }
+            }
+        };
+        // The stream will stop on `Err`, so we need to return `Ok`.
+        Ok(())
+    });
+    handle.spawn(udp_sender);
+
     // The duty of the initiator is trying to connect to the peers 
     // unless connection is established. 
     // Connect means to send a Hello message with info about self.
@@ -146,19 +166,10 @@ fn main() {
                         .for_each(|_| {
                             for ad in &peer_list {
                                 println!("Send Init to {}",ad);
+                                let thread_tx = tx.clone();
                                 let buf: Vec<u8> = vec![0;10];
                                 let msg = (ad.clone(),buf);
-                                let res = udp_sinks[0].start_send(msg).unwrap();
-                                let res = udp_sinks[0].poll_complete();
-                                match res {
-                                    Ok(_)  => println!("sent"),
-                                    Err(e) => {
-                                        match e.kind() {
-                                            AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
-                                            _ => println!("{:?}",e)
-                                        }
-                                    }
-                                };
+                                thread_tx.send(msg).wait().unwrap();
                             };
                             Ok(())
                         });
@@ -168,6 +179,10 @@ fn main() {
                         .for_each(|_| {
                             for ad in &peer_list {
                                 println!("Send Data to {}",ad);
+                                let thread_tx = tx.clone();
+                                let buf: Vec<u8> = vec![0;10];
+                                let msg = (ad.clone(),buf);
+                                thread_tx.send(msg).wait().unwrap();
                             };
                             Ok(())
                         });
@@ -210,6 +225,8 @@ fn main() {
         Ok(())
     });
 
+    //let server = server.join(udp_sender);
+    //let server = udp_sender.join(server);
     let server = server.join(initiator);
     let server = server.join(communicator);
 
