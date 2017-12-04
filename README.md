@@ -1,9 +1,10 @@
 # uservpn-socks5
 
-This is work in progress project.
+# This is a work in progress project. => DOES NOT WORK YET
+
 It shall be: A multi-server and multi-client vpn to internet showing up as socks5-proxy on client side
 
-The tokio-socks5 project has been used as basis for the implementation.
+The tokio-socks5 project has been used as a starter for the implementation.
 
 [![Build Status](https://travis-ci.org/gin66/uservpn-socks5.svg?branch=mba)](https://travis-ci.org/gin66/uservpn-socks5)
 
@@ -56,8 +57,9 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 * [ ] R31 Autoupdate of all Servers triggered by client informing about latest SW
 * [ ] R32 SW distribution via github
 * [ ] R33 If a server dies, all connections are dropped
-* [ ] R34 Every client and server uses a unique ID from 0 to 255
+* [ ] R34 Every client and server uses a unique ID from 1 to 254
 * [ ] R35 Shared key and configuration stored in configuration file
+* [ ] R36 Both sides of a TCP communication send keep-alive packets e.g. 10 mins
 
 ## Usage - OUTDATED
 
