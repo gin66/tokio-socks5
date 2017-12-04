@@ -139,7 +139,7 @@ fn main() {
     //
     let (tx, rx): (Sender<(SocketAddr, Vec<u8>)>,Receiver<(SocketAddr, Vec<u8>)>) = mpsc::channel(100);
     println!("number of listen sockets = {}",udp_sinks.len());
-    let mut counter: Vec<usize> = vec![0];
+    let counter: Vec<usize> = vec![0];
     let counter = RefCell::new(counter);
     let udp_sender = rx.for_each(move |msg| {
         let mut counter = counter.borrow_mut();
@@ -150,10 +150,9 @@ fn main() {
         } else { cnt + 1 };
         counter[0] = cnt;
 
-        let res = udp_sinks[cnt].start_send(msg).unwrap();
         let res = udp_sinks[cnt].poll_complete();
         match res {
-            Ok(_)  => println!("sent"),
+            Ok(_)  => println!("poll_complete is ok"),
             Err(e) => {
                 match e.kind() {
                     AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
@@ -161,6 +160,7 @@ fn main() {
                 }
             }
         };
+        let _res = udp_sinks[cnt].start_send(msg).unwrap();
         // The stream will stop on `Err`, so we need to return `Ok`.
         Ok(())
     });
