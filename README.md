@@ -14,52 +14,56 @@ There are already several vpn-solutions, which all do not fully meet my requirem
 Solutions as per my knowledge:
 * openvpn: Only point-to-point and not always working well (blocked)
 * tinc: Is distributed, but internet access depending on URL is not supported.
-* vpncloud: Similar to tinc. Internet access is difficult.
+* vpncloud: Similar to tinc 
 * kcptun: Only point to point
 * shadowsocks: Only point-to-point
 
 The first four make use of a tun- or tap-device. Thus root is needed on client and server, which is IMHO a drawback.
 
 ## Requirements
-* [ ] R01 Several clients connect to several servers
-* [ ] R02 The servers are assumed to have good internet connection
-* [ ] R03 List of static servers (IP/port)
-* [ ] R04 Servers and their IPs can be extended dynamically
-* [ ] R05 Server inform each other about client's IP
-* [ ] R06 Servers and clients are uniquely numbered
-* [ ] R07 Client decide server for internet access for one site
-* [ ] R08 Client uses same server for selected site for whole session
-* [ ] R09 Client uses socks protocol in order to avoid tcp-over-tcp problem
-* [ ] R10 Server/Client keeps tcp connections alive
-* [ ] R11 Client uses one cache per server
-* [ ] R12 Out of band messages supported
-* [ ] R13 Client requests messages to be sent/resent
-* [ ] R14 Client-Server communication uses encryption
-* [ ] R15 Encryption uses static shared key (no session authentication protocol)
-* [ ] R16 Client-Server communication is pluggable for protocols
-* [ ] R16.1 Protocol TCP
-* [ ] R16.2 Protocol UCP
-* [ ] R16.3 Protocol KCP
-* [ ] R17 Client asks server for their connection time to a site
-* [ ] R18 Client/server round trip is measured
-* [ ] R19 Server informs client about client's IP/Port connections
-* [ ] R20 Server communicates only, if minimum one client is connected
-* [ ] R21 Each server keeps persistent tcp-connection to static servers
-* [ ] R22 Each server maintains database of servers/clients
-* [ ] R23 Each server keeps cache of client messages
-* [ ] R24 Encryption of header with watermarking
-* [ ] R25 Client acts as socks server for local/direct connections
-* [ ] R26 Server-Client together implement socks5-proxy
-* [ ] R27 Language should be rust (for performance reasons)
-* [ ] R28 Portion of traffic from client to server will be always sent to other servers
-* [ ] R29 Server intercommunication happens on new client connect
-* [ ] R30 Server maintains one cache per client
-* [ ] R31 Autoupdate of all Servers triggered by client informing about latest SW
-* [ ] R32 SW distribution via github
-* [ ] R33 If a server dies, all connections are dropped
-* [ ] R34 Every client and server uses a unique ID from 1 to 254
-* [ ] R35 Shared key and configuration stored in configuration file
-* [ ] R36 Both sides of a TCP communication send keep-alive packets e.g. 10 mins
+* [ ] R.. Connected nodes form a uservpn
+* [ ] R.. Nodes are uniquely numbered (range 1-254)
+* [ ] R.. Nodes with socks5-proxy enabled are typically clients
+* [ ] R.. Nodes can have roaming IP/ports
+* [ ] R.. Nodes with fixed IPs are considered as servers
+* [ ] R.. Nodes with NAT-IPs are considered as temporary servers
+* [ ] R.. Working uservpn needs minimum one server
+* [ ] R.. Messages are exchanged/routed via Nodes. Hopcount max 2
+* [ ] R.. Every Node maintains list of all nodes
+* [ ] R.. Every Node can have more than one IP/port for communication
+* [ ] R.. The servers are assumed to have good internet connection
+* [ ] R.. Nodes inform each other about other nodes' IP/port
+* [ ] R.. Nodes with outdated info get updated information from up-to-date nodes
+* [ ] R.. Clients decide internet access point per site
+* [ ] R.. Clients use same server for selected site for whole session
+            => Rationale: Some internet sites require login on IP change
+* [ ] R.. Server/Client keeps tcp connections alive (e.g. empty data messages)
+* [ ] R.. Client uses socks protocol for its client in order to avoid tcp-over-tcp problem
+* [ ] R.. Client multiplexes all TCP connections onto one byte stream per server
+* [ ] R.. Client uses one cache per server
+* [ ] R.. Out of band messages supported
+* [ ] R.. Node sink requests messages to be sent/resent
+* [ ] R.. Node communication uses encryption - ALL message bytes
+* [ ] R.. Encryption uses static shared key (no session authentication protocol)
+* [ ] R.. Two stage encryption of a message: Header and payload separately
+* [ ] R.. Encryption of header with watermarking
+* [ ] R.. Shared key and configuration stored in configuration file
+* [ ] R.. List of static servers (IP/port) as command line or configuration option
+* [ ] R.. Node communication is pluggable for protocols
+* [ ] R...Support node to node protocol: TCP
+* [ ] R...Support node to node protocol: UDP
+* [ ] R...Support node to node protocol: KCP ?
+* [ ] R.. Messages allow flight time to be measured
+* [ ] R.. Two Nodes aka Server-Client together implement socks5-proxy
+* [ ] R.. Language should be rust (for performance reasons) - not python
+* [ ] R.. Portion of traffic from client to server will be always sent via other nodes
+* [ ] R.. Autoupdate of all nodes triggered by node informing about latest SW
+* [ ] R.. SW distribution via github
+* [ ] R.. If a server dies, all connections via that server are dropped
+* [ ] R.. Both sides of a TCP communication send keep-alive packets e.g. 10 mins
+* [ ] R.. UDP as part of socks protocol is not supported  
+* [ ] R.. DNS never happens on a client
+* [ ] R.. Best server to access internet is determined e.g. by Geo-IP or just test
 
 ## Usage - OUTDATED
 
