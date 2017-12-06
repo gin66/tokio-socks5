@@ -1,42 +1,3 @@
-//! An example [SOCKSv5] proxy server on top of futures
-//!
-//! [SOCKSv5]: https://www.ietf.org/rfc/rfc1928.txt
-//!
-//! This program is intended to showcase many aspects of the futures crate and
-//! I/O integration, explaining how many of the features can interact with one
-//! another and also provide a concrete example to see how easily pieces can
-//! interoperate with one another.
-//!
-//! A SOCKS proxy is a relatively easy protocol to work with. Each TCP
-//! connection made to a server does a quick handshake to determine where data
-//! is going to be proxied to, another TCP socket is opened up to this
-//! destination, and then bytes are shuffled back and forth between the two
-//! sockets until EOF is reached.
-//!
-//! This server implementation is relatively straightforward, but
-//! architecturally has a few interesting pieces:
-//!
-//! * The entire server only has one buffer to read/write data from. This global
-//!   buffer is shared by all connections and each proxy pair simply reads
-//!   through it. This is achieved by waiting for both ends of the proxy to be
-//!   ready, and then the transfer is done.
-//!
-//! * Initiating a SOCKS proxy connection may involve a DNS lookup, which
-//!   is done with the TRust-DNS futures-based resolver. This demonstrates the
-//!   ease of integrating a third-party futures-based library into our futures
-//!   chain.
-//!
-//! * The entire SOCKS handshake is implemented using the various combinators in
-//!   the `futures` crate as well as the `tokio_core::io` module. The actual
-//!   proxying of data, however, is implemented through a manual implementation
-//!   of `Future`. This shows how it's easy to transition back and forth between
-//!   the two, choosing whichever is the most appropriate for the situation at
-//!   hand.
-//!
-//! You can try out this server with `cargo test` or just `cargo run` and
-//! throwing connections at it yourself, and there should be plenty of comments
-//! below to help walk you through the implementation as well!
-
 #[macro_use]
 extern crate log;
 extern crate env_logger;
@@ -59,6 +20,7 @@ use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
 
 use futures::{future,Future, Stream, Sink};
+use futures::sync::oneshot;
 use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
@@ -134,6 +96,24 @@ fn main() {
         udp_sinks.push(udp_sink);
         udp_streams.push(udp_stream);
     }
+
+    
+    let (fut_tx, fut_rx) = mpsc::channel::<(String,oneshot::Sender<(SocketAddr, u8)>)>(100);
+    let resolver = fut_rx.for_each( |msg| {
+        let (s,tx) = msg;
+        // Translate the address in s into SocketAddr and Server
+        let addr = s.parse::<SocketAddr>().unwrap();
+        tx.send( (addr,0) ).unwrap();
+        // The stream will stop on `Err`, so we need to return `Ok`.
+        Ok(())
+    });
+    handle.spawn(resolver);
+
+    println!("Send");
+    let (res_tx, res_rx) = oneshot::channel::<(SocketAddr, u8)>();
+    fut_tx.send( ("127.0.0.1:8080".to_string(),res_tx) ).wait().unwrap();
+    println!("{:?}",lp.run(res_rx).unwrap());
+    println!("Done");
 
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
