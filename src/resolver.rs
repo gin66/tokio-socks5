@@ -30,14 +30,10 @@ pub struct Responder<Q,A,E> {
 impl<Q:'static,A:'static,E:'static> Responder<Q,A,E> where E: Debug { 
     pub fn gen_start<F>(handle: &Handle,f:&'static F) -> Responder<Q,A,E>
         where 
-            F : Fn(Q,oneshot::Sender<Result<A,E>>)
+            F : Fn((Q,oneshot::Sender<Result<A,E>>)) -> Result<(),()>
     {
         let (fut_tx, fut_rx) = mpsc::channel::<MsgRequest<Q,A,E>>(100);
-        let resolver = fut_rx.for_each(move |msg| {
-            let (q,tx) : (Q,oneshot::Sender<Result<A,E>>) = msg;
-            f(q,tx);
-            Ok(())
-        });
+        let resolver = fut_rx.for_each(move |msg| f(msg));
         handle.spawn(resolver);
         Responder {
             fut_tx,
@@ -52,9 +48,11 @@ impl<Q:'static,A:'static,E:'static> Responder<Q,A,E> where E: Debug {
     }
 }
 
-fn resolve(q: String,tx: oneshot::Sender<Result<(SocketAddr,u8),String>>) {
+fn resolve(msg: (String,oneshot::Sender<Result<(SocketAddr,u8),String>>)) -> Result<(),()> {
+    let (q,tx) = msg;
     let a = Ok((q.parse::<SocketAddr>().unwrap(),0));
     let _res = tx.send(a);
+    Ok(())
 }
 
 pub fn start(handle: &Handle) -> Responder<String,(SocketAddr,u8),String> {
