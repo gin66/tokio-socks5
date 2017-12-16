@@ -21,7 +21,6 @@ use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
 
 use futures::{future,Future, Stream, Sink};
-use futures::sync::oneshot;
 use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
@@ -100,7 +99,7 @@ fn main() {
     }
 
     println!("Request");
-    let resolver = resolver::xstart(&handle);
+    let resolver = resolver::start(&handle);
     thread::spawn(move ||{
         println!("Spawned");
         let res = resolver.query("127.0.0.1:8080".to_string());
@@ -108,24 +107,6 @@ fn main() {
         println!("{:?}",res);
         futures::done::<(), ()>(Ok(()))
     });
-
-    println!("Next");
-    let (fut_tx, fut_rx) = mpsc::channel::<(String,oneshot::Sender<(SocketAddr, u8)>)>(100);
-    let resolver = fut_rx.for_each( |msg| {
-        let (s,tx) = msg;
-        // Translate the address in s into SocketAddr and Server
-        let addr = s.parse::<SocketAddr>().unwrap();
-        tx.send( (addr,0) ).unwrap();
-        // The stream will stop on `Err`, so we need to return `Ok`.
-        Ok(())
-    });
-    handle.spawn(resolver);
-
-    println!("Send");
-    let (res_tx, res_rx) = oneshot::channel::<(SocketAddr, u8)>();
-    fut_tx.send( ("127.0.0.1:8080".to_string(),res_tx) ).wait().unwrap();
-    println!("{:?}",lp.run(res_rx).unwrap());
-    println!("Done");
 
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
