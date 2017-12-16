@@ -9,6 +9,7 @@ extern crate trust_dns;
 #[macro_use]
 extern crate clap;
 
+use std::thread;
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
 //use std::net::{Shutdown, IpAddr};
@@ -34,6 +35,7 @@ use socks::SocksClient;
 
 mod message;
 mod socks;
+mod resolver;
 
 fn main() {
     drop(env_logger::init());
@@ -97,7 +99,17 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
-    
+    println!("Request");
+    let resolver = resolver::xstart(&handle);
+    thread::spawn(move ||{
+        println!("Spawned");
+        let res = resolver.query("127.0.0.1:8080".to_string());
+        println!("Done");
+        println!("{:?}",res);
+        futures::done::<(), ()>(Ok(()))
+    });
+
+    println!("Next");
     let (fut_tx, fut_rx) = mpsc::channel::<(String,oneshot::Sender<(SocketAddr, u8)>)>(100);
     let resolver = fut_rx.for_each( |msg| {
         let (s,tx) = msg;
