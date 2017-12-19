@@ -5,17 +5,18 @@ extern crate futures;
 #[macro_use]
 extern crate tokio_core;
 extern crate tokio_io;
+extern crate tokio_timer;
 extern crate trust_dns;
 #[macro_use]
 extern crate clap;
 
-use std::thread;
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
 //use std::net::{Shutdown, IpAddr};
 use std::net::SocketAddr;
 //use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::rc::Rc;
+use std::sync::{Arc,Mutex};
 //use std::str;
 use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
@@ -98,15 +99,7 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
-    println!("Request");
     let resolver = resolver::start(&handle);
-    thread::spawn(move ||{
-        println!("Spawned");
-        let res = resolver.query("127.0.0.1:8080".to_string());
-        println!("Done");
-        println!("{:?}",res);
-        futures::done::<(), ()>(Ok(()))
-    });
 
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
@@ -117,6 +110,10 @@ fn main() {
     let counter: Vec<usize> = vec![0];
     let counter = RefCell::new(counter);
     let udp_sender = rx.for_each(move |msg| {
+        println!("Call query for_each");
+        let rx = resolver.clone();
+        let res = rx.query("127.0.0.1:8080".to_string());
+
         let mut counter = counter.borrow_mut();
         println!("{:?}",counter);
         let mut cnt = counter[0];
