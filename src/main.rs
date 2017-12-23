@@ -16,7 +16,7 @@ use std::cell::RefCell;
 use std::net::SocketAddr;
 //use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::rc::Rc;
-use std::sync::{Arc,Mutex};
+//use std::sync::{Arc,Mutex};
 //use std::str;
 use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
@@ -99,7 +99,24 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
-    let resolver = resolver::start(&handle);
+    let resolver = resolver::start(handle.clone());
+
+    let resolve_test = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                  Duration::new(1,0),&handle).unwrap()
+                        .then(move |_| {
+                            println!("Call query for_each");
+                            let rx = resolver.clone();
+                            rx.query("127.0.0.1:8080".to_string())
+                        })
+                        .and_then( |ans| {
+                            println!("got answer {:?}",ans);
+                            Ok(())
+                        })
+                        .for_each(|_| {
+                            Ok(())
+                        })
+                        .then( |_| { Ok(())});
+    handle.spawn(resolve_test);
 
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
@@ -110,10 +127,6 @@ fn main() {
     let counter: Vec<usize> = vec![0];
     let counter = RefCell::new(counter);
     let udp_sender = rx.for_each(move |msg| {
-        println!("Call query for_each");
-        let rx = resolver.clone();
-        let res = rx.query("127.0.0.1:8080".to_string());
-
         let mut counter = counter.borrow_mut();
         println!("{:?}",counter);
         let mut cnt = counter[0];
@@ -148,31 +161,41 @@ fn main() {
     //      3. If peer is not connected, initiate sending Hello message
     //
     // initiator helds a future to be waited for
+    let peer_list2 = peer_list.clone();
+    let tx2 = tx.clone();
+    let handle2 = handle.clone();
     let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
                                   Duration::new(10,0),&handle).unwrap()
-                        .for_each(|_| {
-                            for ad in &peer_list {
+                        .for_each(move |_| {
+                            for ad in &peer_list2 {
                                 println!("Send Init to {}",ad);
-                                let thread_tx = tx.clone();
+                                let thread_tx = tx2.clone();
                                 let buf: Vec<u8> = vec![0;10];
                                 let msg = (ad.clone(),buf);
-                                thread_tx.send(msg).wait().unwrap();
+                                handle2.spawn(thread_tx.send(msg)
+                                                .then( |_| { Ok(())}));
                             };
                             Ok(())
-                        });
+                        })
+                        .then( |_| { Ok(())});
+    handle.spawn(initiator);
 
+    let handle2 = handle.clone();
     let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
                                   Duration::new(1,0),&handle).unwrap()
-                        .for_each(|_| {
+                        .for_each(move |_| {
                             for ad in &peer_list {
                                 println!("Send Data to {}",ad);
                                 let thread_tx = tx.clone();
                                 let buf: Vec<u8> = vec![0;10];
                                 let msg = (ad.clone(),buf);
-                                thread_tx.send(msg).wait().unwrap();
+                                handle2.spawn(thread_tx.send(msg)
+                                                .then( |_| { Ok(())}));
                             };
                             Ok(())
-                        });
+                        })
+                        .then( |_| { Ok(())});
+    handle.spawn(communicator);
 
     // This is the address of the DNS server we'll send queries to. If
     // external servers can't be used in your environment, you can substitue
@@ -211,11 +234,6 @@ fn main() {
         }));
         Ok(())
     });
-
-    //let server = server.join(udp_sender);
-    //let server = udp_sender.join(server);
-    let server = server.join(initiator);
-    let server = server.join(communicator);
 
     // Now that we've got our server as a future ready to go, let's run it!
     //
