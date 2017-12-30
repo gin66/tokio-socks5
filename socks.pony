@@ -61,8 +61,8 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 data(1)? = socks_v5_reply_cmd_not_supported
                 conn.write(consume data)
                 error
-            end // Only support CONNECT
-            if data(3)? != 1 then 
+            end
+            if (data(3)? != socks_v5_atyp_ipv4) and (data(3)? != socks_v5_atyp_domain) then 
                 data(1)? = socks_v5_reply_atyp_not_supported
                 conn.write(consume data)
                 error
