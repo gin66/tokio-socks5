@@ -21,5 +21,5 @@ actor Main
     try
       UDPSocket(env.root as AmbientAuth, MyUDPNotify, "", "8989")
       TCPListener(env.root as AmbientAuth,
-        recover SocksTCPListenNotify(logger) end, "", "8989")
+        recover SocksTCPListenNotify(logger) end, "", "8989" where max_size = 1492)
     end

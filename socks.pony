@@ -62,11 +62,18 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 conn.write(consume data)
                 error
             end
-            if (data(3)? != socks_v5_atyp_ipv4) and (data(3)? != socks_v5_atyp_domain) then 
+            var atyp_len: U8 = 0
+            match data(3)?
+            | socks_v5_atyp_ipv4   => atyp_len = 4
+            | socks_v5_atyp_domain => atyp_len = data(4)? + 1
+            else
                 data(1)? = socks_v5_reply_atyp_not_supported
                 conn.write(consume data)
                 error
             end // only IPV4 address type
+            if data.size() != (USize.from[U8](atyp_len) + 6) then
+                error
+            end
             data(1)? = socks_v5_reply_ok
             conn.write(consume data)  // Reply with OK
             _state = Socks5PassThrough
@@ -77,7 +84,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     else
         conn.dispose()
     end
-    true
+    false
 
   fun ref throttled(conn: TCPConnection ref) =>
     None
