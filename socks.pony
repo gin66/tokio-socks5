@@ -4,9 +4,9 @@ use "logger"
 
 primitive Socks5WaitInit
 primitive Socks5WaitRequest
-primitive Socks5PassThrough
+primitive Socks5WaitConnect
 
-type Socks5State is (Socks5WaitInit | Socks5WaitRequest | Socks5PassThrough)
+type Socks5State is (Socks5WaitInit | Socks5WaitRequest | Socks5WaitConnect)
 
 class SocksTCPConnectionNotify is TCPConnectionNotify
     let socks_v5_version : U8 = 5
@@ -30,13 +30,15 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     let socks_v5_reply_atyp_not_supported : U8 = 8
 
     let _logger:   Logger[String]
+    let _resolver: Resolver
     var _state:    Socks5State
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
 
-    new iso create(logger: Logger[String]) =>
-        _logger = logger
-        _state  = Socks5WaitInit
+    new iso create(resolver: Resolver, logger: Logger[String]) =>
+        _resolver = resolver
+        _logger   = logger
+        _state    = Socks5WaitInit
 
     fun ref received(
         conn: TCPConnection ref,
@@ -54,6 +56,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             _logger(Info) and _logger.log("Received handshake")
             if data(0)? != socks_v5_version then error end
             if data.size() != (USize.from[U8](data(1)?) + 2) then error end
+            data.find(socks_v5_meth_no_auth, 2)?
             _logger(Info) and _logger.log("Send initial response")
             conn.write([socks_v5_version;socks_v5_meth_no_auth])
             _state = Socks5WaitRequest
@@ -73,16 +76,19 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 data(1)? = socks_v5_reply_atyp_not_supported
                 conn.write(consume data)
                 error
-            end // only IPV4 address type
+            end
             if data.size() != (USize.from[U8](atyp_len) + 6) then
                 error
             end
             data(1)? = socks_v5_reply_ok
-            conn.write(consume data)  // Reply with OK
-            _state = Socks5PassThrough
-        | Socks5PassThrough=>
-            _logger(Info) and _logger.log("Received data")
-            conn.write(String.from_array(consume data))
+            // The resolver should call set_notify on actor conn.
+            // This means, no more communication should happen with this notifier
+            _resolver.connect_to(conn,consume data)
+            _state = Socks5WaitConnect
+        | Socks5WaitConnect=>
+            _logger(Info) and _logger.log("Received data, while waiting for connection")
+            error
+            //conn.write(String.from_array(consume data))
         end
     else
         conn.dispose()
@@ -114,12 +120,14 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
 
 class SocksTCPListenNotify is TCPListenNotify
     let _logger: Logger[String]
+    let _resolver: Resolver
 
-    new iso create(logger: Logger[String]) =>
-        _logger = logger
+    new iso create(resolver: Resolver, logger: Logger[String]) =>
+        _resolver = resolver
+        _logger   = logger
 
     fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-        SocksTCPConnectionNotify(_logger)
+        SocksTCPConnectionNotify(_resolver, _logger)
 
     fun ref listening(listen: TCPListener ref) =>
         _logger(Info) and _logger.log("Successfully bound to address")
