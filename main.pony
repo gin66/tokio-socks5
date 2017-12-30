@@ -1,5 +1,6 @@
 use "net"
 use "logger"
+use "files"
 
 class MyUDPNotify is UDPNotify
   fun ref received(
@@ -12,11 +13,32 @@ class MyUDPNotify is UDPNotify
   fun ref not_listening(sock: UDPSocket ref) =>
     None
 
+primitive MyLogFormatter is LogFormatter
+  fun apply(msg: String, loc: SourceLoc): String =>
+    let file_name: String = loc.file()
+    let file_linenum: String  = loc.line().string()
+    let file_linepos: String  = loc.pos().string()
+
+    (recover String(file_name.size()
+      + file_linenum.size()
+      + file_linepos.size()
+      + msg.size()
+      + 4)
+    end)
+     .> append(Path.base(file_name))
+     .> append(":")
+     .> append(file_linenum)
+     .> append(":")
+     .> append(file_linepos)
+     .> append(": ")
+     .> append(msg)
+
 actor Main
   new create(env: Env) =>
     let logger = StringLogger(
       Info,
-      env.out)
+      env.out,
+      MyLogFormatter)
     let resolver = Resolver(logger)
     logger(Info) and logger.log("my info message")
     try

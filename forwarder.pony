@@ -23,8 +23,8 @@ class ForwardTCPConnectionNotify is TCPConnectionNotify
         for i in Range(0,data.size()) do
             _logger(Info) and _logger.log(i.string()+":"+data(i)?.string())
         end
-        _logger(Info) and _logger.log("Received data, while waiting for connection")
-        conn.write(String.from_array(consume data))
+        // This would be just echoing
+        // conn.write(String.from_array(consume data))
     else
         conn.dispose()
     end
