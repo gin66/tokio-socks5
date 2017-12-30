@@ -1,43 +1,29 @@
-language: c
+language: rust
 
-branches:
-  only:
-    - master
+cache: cargo
 
-sudo: required
+rust:
+- stable
+  # - beta
+  # - nightly
 
-matrix:
-  include:
-    - os: linux
-      addons:
-        apt:
-          sources:
-            - ubuntu-toolchain-r-test
-          packages:
-            - g++-6
-      env:
-        - LLVM_VERSION="3.9.1"
-        - LLVM_CONFIG="llvm-config-3.9"
-        - config=release
-        - CC1=gcc
-        - CXX1=g++
-        - ICC1=gcc-6
-        - ICXX1=g++-6
-
-install:
-  - bash .travis_install.bash
-
-#script:
-#  - make test
+sudo: false
+script:
+- cargo test
+- cargo build --release
 
 notifications:
   email:
     on_success: never
 
+os:
+- linux
+  # - osx
+
 before_deploy:
     - echo ${TRAVIS_OS_NAME}
-    - export FILENAME=uservpn-socks5-${TRAVIS_OS_NAME}
-    - mv uservpn-socks5 ${FILENAME}
+    - export FILENAME=tokio-socks5-${TRAVIS_OS_NAME}
+    - mv target/release/tokio-socks5 ${FILENAME}
 
 deploy:
   provider: releases
