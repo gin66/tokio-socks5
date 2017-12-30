@@ -29,8 +29,10 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     let socks_v5_reply_cmd_not_supported  : U8 = 7
     let socks_v5_reply_atyp_not_supported : U8 = 8
 
-    let _logger: Logger[String]
-    var _state:  Socks5State
+    let _logger:   Logger[String]
+    var _state:    Socks5State
+    var _tx_bytes: USize = 0
+    var _rx_bytes: USize = 0
 
     new iso create(logger: Logger[String]) =>
         _logger = logger
@@ -43,6 +45,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
         : Bool
     =>
     try 
+        _rx_bytes = _rx_bytes + data.size()
         for i in Range(0,data.size()) do
             _logger(Info) and _logger.log(i.string()+":"+data(i)?.string())
         end
@@ -86,6 +89,14 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     end
     false
 
+    fun ref sent(
+        conn: TCPConnection ref,
+        data: (String val | Array[U8] val))
+        : (String val | Array[U8 val] val)
+    =>
+    _tx_bytes = _tx_bytes + data.size()
+    data
+
   fun ref throttled(conn: TCPConnection ref) =>
     None
 
@@ -99,7 +110,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     None
 
   fun ref closed(conn: TCPConnection ref) =>
-    _logger(Info) and _logger.log("Connection closed")
+    _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
 
 class SocksTCPListenNotify is TCPListenNotify
   let _logger: Logger[String]
