@@ -97,35 +97,35 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     _tx_bytes = _tx_bytes + data.size()
     data
 
-  fun ref throttled(conn: TCPConnection ref) =>
-    None
+    fun ref throttled(conn: TCPConnection ref) =>
+        None
 
-  fun ref unthrottled(conn: TCPConnection ref) =>
-    None
+    fun ref unthrottled(conn: TCPConnection ref) =>
+        None
 
-  fun ref accepted(conn: TCPConnection ref) =>
-    None
+    fun ref accepted(conn: TCPConnection ref) =>
+        None
 
-  fun ref connect_failed(conn: TCPConnection ref) =>
-    None
+    fun ref connect_failed(conn: TCPConnection ref) =>
+        None
 
-  fun ref closed(conn: TCPConnection ref) =>
-    _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+    fun ref closed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
 
 class SocksTCPListenNotify is TCPListenNotify
-  let _logger: Logger[String]
+    let _logger: Logger[String]
 
-  new iso create(logger: Logger[String]) =>
-    _logger = logger
+    new iso create(logger: Logger[String]) =>
+        _logger = logger
 
-  fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-    SocksTCPConnectionNotify(_logger)
+    fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
+        SocksTCPConnectionNotify(_logger)
 
-  fun ref listening(listen: TCPListener ref) =>
-    _logger(Info) and _logger.log("Successfully bound to address")
+    fun ref listening(listen: TCPListener ref) =>
+        _logger(Info) and _logger.log("Successfully bound to address")
 
-  fun ref not_listening(listen: TCPListener ref) =>
-    _logger(Info) and _logger.log("Cannot bind to listen address")
+    fun ref not_listening(listen: TCPListener ref) =>
+        _logger(Info) and _logger.log("Cannot bind to listen address")
 
-  fun ref closed(listen: TCPListener ref) =>
-    _logger(Info) and _logger.log("Successfully closed TCP listeners")
+    fun ref closed(listen: TCPListener ref) =>
+        _logger(Info) and _logger.log("Successfully closed TCP listeners")
