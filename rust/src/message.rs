@@ -5,7 +5,7 @@ use tokio_core::net::UdpCodec;
 
 // The message header is watermarked and as such should be of length n*128 bits aka 16 Bytes
 // and n >= 3.
-pub struct MessageHeader { 
+pub struct MessageInfo { // Can be placed after payload with few separating waste bytes
 	// first 128 bit block
 	pub magic: [u8; 8],
 	pub index: u32,
@@ -16,17 +16,17 @@ pub struct MessageHeader {
 	pub key2: u64,
 
 	// third 128 bit block
-	pub payload_len: u16,
-	pub crc_payload: u16,
-	pub origin_ms: u16,
-	pub hop1_ms: u16,
-	pub hop2_ms: u16,
+	pub network_info: u32,
+	pub payload_info: u8,  // 3 bits for number of waste bytes + 5 bits typ
+	pub origin_4ms: u8,
+	pub hop1_4ms: u8,
+	pub hop2_4ms: u8,
 	pub origin_id: u8,
 	pub hop1_id: u8,
 	pub hop2_id: u8,
 	pub destination_id: u8,
-	pub typ: u8,
-	pub pad: u8,
+	pub crc_payload: u16,
+	pub pad1: u16,
 }
 
 pub struct MessageCodec {

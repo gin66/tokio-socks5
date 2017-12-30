@@ -33,6 +33,19 @@ use trust_dns::udp::UdpClientStream;
 
 use socks::SocksClient;
 
+//
+// The following streams/futures are executed:
+// 1.) UDP sender
+//     It pulls the next message to be sent.
+//     In chain to this are:
+//      - Transmission rate limiter
+//      - select:
+//            1.) messages to sent
+//            2.) messages to be forwarded
+//            3.) network messages
+// 2.) For each client connection a TCP sender
+//     It pulls the next message to be sent.    
+
 mod message;
 mod socks;
 mod resolver;
