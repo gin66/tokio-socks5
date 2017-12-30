@@ -68,22 +68,32 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 conn.write(consume data)
                 error
             end
-            var atyp_len: U8 = 0
+            var atyp_len: USize = 0
+            var addr: InetAddr iso
             match data(3)?
-            | socks_v5_atyp_ipv4   => atyp_len = 4
-            | socks_v5_atyp_domain => atyp_len = data(4)? + 1
+            | socks_v5_atyp_ipv4   => 
+                atyp_len = 4
+                addr  = [data(4)?;data(5)?;data(6)?;data(7)?]
+            | socks_v5_atyp_domain => 
+                let astr_len = USize.from[U8](data(4)?)
+                atyp_len = astr_len + 1
+                var dest : String iso = recover iso String end
+                for i in Range(0,atyp_len) do
+                    dest.push(data(5+i)?)
+                end
+                addr  = consume dest
             else
                 data(1)? = socks_v5_reply_atyp_not_supported
                 conn.write(consume data)
                 error
             end
-            if data.size() != (USize.from[U8](atyp_len) + 6) then
+            if data.size() != (atyp_len + 6) then
                 error
             end
             data(1)? = socks_v5_reply_ok
             // The resolver should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            _resolver.connect_to(conn,consume data)
+            _resolver.connect_to(conn,consume addr,consume data)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")
