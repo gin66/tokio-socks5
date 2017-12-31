@@ -45,16 +45,16 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         _peer.write(consume data)
 
     fun ref throttled(conn: TCPConnection ref) =>
-        None
+        _peer.mute()
 
     fun ref unthrottled(conn: TCPConnection ref) =>
-        None
+        _peer.unmute()
 
     fun ref accepted(conn: TCPConnection ref) =>
         None
 
     fun ref connect_failed(conn: TCPConnection ref) =>
-        None
+        _peer.dispose()
 
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
