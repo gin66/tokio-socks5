@@ -36,6 +36,10 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         data: (String val | Array[U8] val))
         : (String val | Array[U8 val] val)
     =>
+    if data.size() == 0 then
+        _logger(Info) and _logger.log("sent empty")
+        conn.close()
+    end
     _tx_bytes = _tx_bytes + data.size()
     data
 
@@ -54,10 +58,13 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         None
 
     fun ref connect_failed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection failed")
         _peer.dispose()
 
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        let empty: Array[U8] iso = recover iso Array[U8]() end
+        _peer.write(consume empty)
 
 class ForwardTCPConnectionNotify is TCPConnectionNotify
     let _logger:   Logger[String]
