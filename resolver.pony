@@ -16,6 +16,12 @@ class InetAddrPort is Stringable
         (let ip1,let ip2,let ip3,let ip4) = ip'
         host = ip1.string()+"."+ip2.string()+"."+ip3.string()+"."+ip4.string()
 
+    fun box host_str() : String iso^ =>
+        host.string()
+
+    fun box port_str() : String iso^ =>
+        port.string()
+
     fun box string() : String iso^ =>
         (host + ":" + port.string()).string()
 
@@ -34,8 +40,14 @@ actor Resolver
             addr: InetAddrPort iso,port: U16,
             socks_reply: Array[U8] iso) =>
         _logger(Info) and _logger.log("Called connect_to "+addr.string())
-        conn.set_notify(ForwardTCPConnectionNotify(this,_logger))
-        conn.write(consume socks_reply)
+        conn.mute()
+        let conn_peer = TCPConnection(_auth,
+                            DirectForwardTCPConnectionNotify(conn,consume socks_reply,_logger),
+                            addr.host_str(),
+                            addr.port_str())
+        let empty: Array[U8] iso = recover iso Array[U8]() end
+        conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer,consume empty,_logger))
+        conn.unmute()
 
     be resolve() =>
         None
