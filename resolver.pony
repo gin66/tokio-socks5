@@ -9,12 +9,17 @@ actor Resolver
     new create(logger: Logger[String]) =>
         _logger = logger
 
-    be connect_to(conn: TCPConnection tag,addr: InetAddr iso,socks_reply: Array[U8] iso) =>
+    be connect_to(conn: TCPConnection tag,
+            addr: InetAddr iso,port: U16,
+            socks_reply: Array[U8] iso) =>
         _logger(Info) and _logger.log("Called connect_to")
         match consume addr
         |    let ip4 : Array[U8] =>
                 try
-                    _logger(Info) and _logger.log(ip4(0)?.string()+"."+ip4(1)?.string()+"."+ip4(2)?.string()+"."+ip4(3)?.string())
+                    _logger(Info) and _logger.log(
+                            ip4(0)?.string()+"."+ip4(1)?.string()
+                            +"."+ip4(2)?.string()+"."+ip4(3)?.string()
+                            +":"+port.string())
                 end
         |    let host: String =>
                 _logger(Info) and _logger.log(host)

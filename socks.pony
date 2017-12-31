@@ -90,10 +90,12 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             if data.size() != (atyp_len + 6) then
                 error
             end
+            var port: U16 = U16.from[U8](data(atyp_len + 4)?)
+            port = (port * 256) + U16.from[U8](data(atyp_len + 5)?)
             data(1)? = socks_v5_reply_ok
             // The resolver should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            _resolver.connect_to(conn,consume addr,consume data)
+            _resolver.connect_to(conn,consume addr,port,consume data)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")
