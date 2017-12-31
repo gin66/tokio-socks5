@@ -37,7 +37,7 @@ actor Resolver
         _logger = logger
 
     be connect_to(conn: TCPConnection tag,
-            addr: InetAddrPort iso,port: U16,
+            addr: InetAddrPort iso,
             socks_reply: Array[U8] iso) =>
         _logger(Info) and _logger.log("Called connect_to "+addr.string())
         conn.mute()

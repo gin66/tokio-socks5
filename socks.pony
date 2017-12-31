@@ -81,7 +81,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 let astr_len = USize.from[U8](data(4)?)
                 atyp_len = astr_len + 1
                 var dest : String iso = recover iso String end
-                for i in Range(0,atyp_len) do
+                for i in Range(0,atyp_len-1) do
                     dest.push(data(5+i)?)
                 end
                 addr  = InetAddrPort.create_from_string(consume dest,port)
@@ -96,7 +96,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             data(1)? = socks_v5_reply_ok
             // The resolver should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            _resolver.connect_to(conn,consume addr,port,consume data)
+            _resolver.connect_to(conn,consume addr,consume data)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")
