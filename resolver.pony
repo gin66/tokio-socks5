@@ -44,7 +44,8 @@ actor Resolver
         let conn_peer = TCPConnection(_auth,
                             DirectForwardTCPConnectionNotify(conn,consume socks_reply,_logger),
                             addr.host_str(),
-                            addr.port_str())
+                            addr.port_str()
+                            where init_size=16384,max_size = 16384)
         let empty: Array[U8] iso = recover iso Array[U8]() end
         conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer,consume empty,_logger))
         conn.unmute()

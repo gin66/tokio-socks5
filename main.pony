@@ -45,5 +45,7 @@ actor Main
       logger(Info) and logger.log("my info message")
       UDPSocket(auth, MyUDPNotify, "", "8989")
       TCPListener(auth,
-        recover SocksTCPListenNotify(resolver,logger) end, "", "8989" where max_size = 1492)
+        recover SocksTCPListenNotify(resolver,logger) end, 
+        "", "8989" 
+        where init_size=16384,max_size = 16384)
     end
