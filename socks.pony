@@ -69,11 +69,14 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 error
             end
             var atyp_len: USize = 0
-            var addr: InetAddr iso
+            var port: U16 = U16.from[U8](data(data.size()-2)?)
+            port = (port * 256) + U16.from[U8](data(data.size()-1)?)
+            var addr: InetAddrPort iso
             match data(3)?
             | socks_v5_atyp_ipv4   => 
                 atyp_len = 4
-                addr  = [data(4)?;data(5)?;data(6)?;data(7)?]
+                let ip  = (data(4)?,data(5)?,data(6)?,data(7)?)
+                addr = InetAddrPort(ip,port)
             | socks_v5_atyp_domain => 
                 let astr_len = USize.from[U8](data(4)?)
                 atyp_len = astr_len + 1
@@ -81,7 +84,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 for i in Range(0,atyp_len) do
                     dest.push(data(5+i)?)
                 end
-                addr  = consume dest
+                addr  = InetAddrPort.create_from_string(consume dest,port)
             else
                 data(1)? = socks_v5_reply_atyp_not_supported
                 conn.write(consume data)
@@ -90,8 +93,6 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             if data.size() != (atyp_len + 6) then
                 error
             end
-            var port: U16 = U16.from[U8](data(atyp_len + 4)?)
-            port = (port * 256) + U16.from[U8](data(atyp_len + 5)?)
             data(1)? = socks_v5_reply_ok
             // The resolver should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier

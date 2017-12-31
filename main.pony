@@ -39,10 +39,11 @@ actor Main
       Info,
       env.out,
       MyLogFormatter)
-    let resolver = Resolver(logger)
-    logger(Info) and logger.log("my info message")
     try
-      UDPSocket(env.root as AmbientAuth, MyUDPNotify, "", "8989")
-      TCPListener(env.root as AmbientAuth,
+      let auth = env.root as AmbientAuth
+      let resolver = Resolver(auth,logger)
+      logger(Info) and logger.log("my info message")
+      UDPSocket(auth, MyUDPNotify, "", "8989")
+      TCPListener(auth,
         recover SocksTCPListenNotify(resolver,logger) end, "", "8989" where max_size = 1492)
     end
