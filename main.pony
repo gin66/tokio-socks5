@@ -1,6 +1,7 @@
 use "net"
 use "logger"
 use "files"
+use "ini"
 
 class MyUDPNotify is UDPNotify
   fun ref received(
@@ -40,9 +41,24 @@ actor Main
       env.out,
       MyLogFormatter)
     try
+      logger(Info) and logger.log("Load ini-file")
+      let ini_file = File(FilePath(env.root as AmbientAuth, "config.ini")?)
+      let sections = IniParse(ini_file.lines())?
+      for section in sections.keys() do
+        env.out.print("Section name is: " + section)
+        for key in sections(section)?.keys() do
+          env.out.print(key + " = " + sections(section)?(key)?)
+        end
+      end
+
       let auth = env.root as AmbientAuth
+
+      logger(Info) and logger.log("Load geo ip database")
+      let ipdb = IpDB(FilePath(auth,"dbip-country-2017-12.csv")?,logger)
+
+      env.out.print(ipdb.locate(1047275918).string())
+
       let resolver = Resolver(auth,logger)
-      logger(Info) and logger.log("my info message")
       UDPSocket(auth, MyUDPNotify, "", "8989")
       TCPListener(auth,
         recover SocksTCPListenNotify(resolver,logger) end, 
