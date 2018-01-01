@@ -54,7 +54,8 @@ actor Main
       let auth = env.root as AmbientAuth
 
       logger(Info) and logger.log("Load geo ip database")
-      let ipdb = IpDB(FilePath(auth,"dbip-country-2017-12.csv")?,logger)
+      let ipdb = IpDBfactory.make(FilePath(auth,"dbip-country-2017-12.csv")?,logger)?
+      ipdb.locate(1047275918)
 
       let resolver = Resolver(auth,logger)
       UDPSocket(auth, MyUDPNotify, "", "8989")
