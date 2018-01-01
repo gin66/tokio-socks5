@@ -43,8 +43,13 @@ actor Main
     try
       let auth = env.root as AmbientAuth
 
-      // Delay load the ip database. This is an actor
-      let ipdb = IpDBfactory.make(FilePath(auth,"dbip-country-2017-12.csv")?,logger)?
+      // Only clients need to load ip database !!!
+      let ipdb = IpDB(logger)
+      let promise = ipdb.locate(1047275918)
+      promise.next[None]({(ans:String) => 
+            logger(Info) and logger.log("Located: " + ans.string()) })
+
+      ipdb.init_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
       logger(Info) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
@@ -66,10 +71,6 @@ actor Main
           error
         end
       end
-
-      let promise = ipdb.locate(1047275918)
-      promise.next[None]({(ans:String) => 
-            logger(Info) and logger.log("Located: " + ans.string()) })
 
       let resolver = Resolver(auth,logger)
       UDPSocket(auth, MyUDPNotify, "", "8989")

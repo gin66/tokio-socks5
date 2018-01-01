@@ -4,46 +4,40 @@ use "regex"
 use "promises"
 use "collections"
 
-primitive IpDBfactory
-    fun make(filename: FilePath, logger:Logger[String]): IpDB ? =>
-        let ip  = "\"(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\""
-        let rex = recover Regex(ip + "," + ip + ",\"([A-Z][A-Z])\"")? end
-        match recover OpenFile(filename) end
-        | let file: File iso =>
-            logger(Info) and logger.log("Start load of Geo IP database")
-            let size = file.size()
-            let ipdb = IpDB(consume file,consume rex,logger)
-            // Process file in chunks of approx. <chunk> Bytes
-            let chunk: USize = 10000
-            for pos in Range(chunk,size+chunk,chunk) do
-                ipdb.process_chunk(pos)
+actor IpDB
+    var db_from : Array[U32] = Array[U32](460589)
+    var db_to   : Array[U32] = Array[U32](460589)
+    var cn      : Array[U16] = Array[U16](460589)
+    let _pending: Array[(U32,Promise[String])] = Array[(U32,Promise[String])]
+    let _logger : Logger[String]
+    var _is_loaded : Bool = false
+
+    new create(logger: Logger[String]) =>
+        _logger = logger
+
+    be init_load(filename: FilePath) =>
+        try
+            let ip  = "\"(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\""
+            let rex = recover Regex(ip + "," + ip + ",\"([A-Z][A-Z])\"")? end
+            match recover OpenFile(filename) end
+            | let file: File iso =>
+                _logger(Info) and _logger.log("Start load of Geo IP database")
+                // Process file in chunks of approx. <chunk> Bytes
+                let chunk: USize = 10000
+                process_chunk(consume file,consume rex,chunk)
+            else
+                _logger(Info) and _logger.log("Error opening file '" + filename.path + "'")
             end
-            ipdb
-        else
-            logger(Info) and logger.log("Error opening file '" + filename.path + "'")
-            error
         end
 
-actor IpDB
-    var db_from: Array[U32] = Array[U32](460589)
-    var db_to  : Array[U32] = Array[U32](460589)
-    var cn     : Array[U16] = Array[U16](460589)
-    let _logger: Logger[String]
-    let _rex   : Regex
-    let _file  : File
-
-    new create(file: File iso, rex: Regex iso, logger: Logger[String]) =>
-        _logger = logger
-        _file   = consume file
-        _rex    = consume rex
-
-    be process_chunk(up_to: USize) =>
+    be process_chunk(file: File iso, rex: Regex val, chunk: USize) =>
         try
-            while _file.position() < up_to do
-                let line: String val = _file.line()?
+            let up_to = file.position() + chunk
+            while file.position() < up_to do
+                let line: String val = file.line()?
                 _logger(Fine) and _logger.log(line)
                 try
-                    let matched = _rex(line)?
+                    let matched = rex(line)?
                     var from_ip: U32 = 0
                     var to_ip:   U32 = 0
                     var country: U16 = 0
@@ -64,8 +58,16 @@ actor IpDB
                     _logger(Fine) and _logger.log(from_ip.string()+" "+to_ip.string()+" "+country.string())
                 end
             end
+            process_chunk(consume file,consume rex,chunk)
         else
             _logger(Info) and _logger.log("Geo IP database load completed")
+            _is_loaded = true
+            try 
+                while true do
+                    (let addr,let promise) = _pending.pop()?
+                    _do_locate(addr,promise)                    
+                end
+            end
         end
 
     fun tag locate(addr: U32): Promise[String] =>
@@ -74,7 +76,11 @@ actor IpDB
         promise
 
     be _do_locate(addr: U32, promise: Promise[String]) =>
-        promise(_u16_to_country(_locate(addr)))
+        if _is_loaded then
+            promise(_u16_to_country(_locate(addr)))
+        else
+            _pending.push( (addr,promise) )
+        end
 
     fun tag _u16_to_country(code: U16): String val =>
         var ans = recover String(2) end
