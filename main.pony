@@ -41,20 +41,32 @@ actor Main
       env.out,
       MyLogFormatter)
     try
+      let auth = env.root as AmbientAuth
+
+      // Delay load the ip database. This is an actor
+      let ipdb = IpDBfactory.make(FilePath(auth,"dbip-country-2017-12.csv")?,logger)?
+
       logger(Info) and logger.log("Load ini-file")
-      let ini_file = File(FilePath(env.root as AmbientAuth, "config.ini")?)
+      let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
-      for section in sections.keys() do
-        env.out.print("Section name is: " + section)
-        for key in sections(section)?.keys() do
-          env.out.print(key + " = " + sections(section)?(key)?)
+      for (id,name) in sections("Nodes")?.pairs() do
+        env.out.print("NODE ID=" + id + " is " + name)
+        if sections.contains(name) then
+          for (key,value) in sections(name)?.pairs() do
+            env.out.print("    " + key + " = " + value)
+            match key
+            | "TCPAddresses" =>
+                for addr in value.split("=").values() do
+                  env.out.print("    " + addr)
+                end
+            end
+          end
+        else
+          env.out.print("    No section for this node")
+          error
         end
       end
 
-      let auth = env.root as AmbientAuth
-
-      logger(Info) and logger.log("Load geo ip database")
-      let ipdb = IpDBfactory.make(FilePath(auth,"dbip-country-2017-12.csv")?,logger)?
       let promise = ipdb.locate(1047275918)
       promise.next[None]({(ans:String) => 
             logger(Info) and logger.log("Located: " + ans.string()) })
