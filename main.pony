@@ -56,12 +56,10 @@ actor Main
       logger(Info) and logger.log("Load geo ip database")
       let ipdb = IpDB(FilePath(auth,"dbip-country-2017-12.csv")?,logger)
 
-      env.out.print(ipdb.locate(1047275918).string())
-
       let resolver = Resolver(auth,logger)
       UDPSocket(auth, MyUDPNotify, "", "8989")
       TCPListener(auth,
         recover SocksTCPListenNotify(resolver,logger) end, 
-        "", "8989" 
+        "127.0.0.1", "8989" 
         where init_size=16384,max_size = 16384)
     end
