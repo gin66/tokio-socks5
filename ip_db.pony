@@ -22,16 +22,16 @@ actor IpDB
             match recover OpenFile(filename) end
             | let file: File iso =>
                 _logger(Info) and _logger.log("Start load of Geo IP database")
-                // Process file in chunks of approx. <chunk> Bytes
-                let chunk: USize = 10000
-                process_chunk(consume file,consume rex,chunk)
+                process_chunk(consume file,consume rex)
             else
                 _logger(Info) and _logger.log("Error opening file '" + filename.path + "'")
             end
         end
 
-    be process_chunk(file: File iso, rex: Regex val, chunk: USize) =>
+    be process_chunk(file: File iso, rex: Regex val) =>
         try
+            // Process file in chunks of approx. <chunk> Bytes
+            let chunk: USize = 10000
             let up_to = file.position() + chunk
             while file.position() < up_to do
                 let line: String val = file.line()?
@@ -58,7 +58,7 @@ actor IpDB
                     _logger(Fine) and _logger.log(from_ip.string()+" "+to_ip.string()+" "+country.string())
                 end
             end
-            process_chunk(consume file,consume rex,chunk)
+            process_chunk(consume file,consume rex)
         else
             _logger(Info) and _logger.log("Geo IP database load completed")
             _is_loaded = true
