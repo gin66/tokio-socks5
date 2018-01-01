@@ -55,7 +55,9 @@ actor Main
 
       logger(Info) and logger.log("Load geo ip database")
       let ipdb = IpDBfactory.make(FilePath(auth,"dbip-country-2017-12.csv")?,logger)?
-      ipdb.locate(1047275918)
+      let promise = ipdb.locate(1047275918)
+      promise.next[None]({(ans:String) => 
+            logger(Info) and logger.log("Located: " + ans.string()) })
 
       let resolver = Resolver(auth,logger)
       UDPSocket(auth, MyUDPNotify, "", "8989")

@@ -1,6 +1,7 @@
 use "files"
 use "logger"
 use "regex"
+use "promises"
 use "collections"
 
 primitive IpDBfactory
@@ -67,12 +68,19 @@ actor IpDB
             _logger(Info) and _logger.log("Geo IP database load completed")
         end
 
-    be locate(addr: U32) =>
-        let country = _locate(addr)
-        var ans = String(2)
-        ans.push(U8.from[U16](country >> 8))
-        ans.push(U8.from[U16](country % 256))
-        _logger(Info) and _logger.log("Located: " + ans.string())
+    fun tag locate(addr: U32): Promise[String] =>
+        let promise = Promise[String]
+        _do_locate(addr,promise)
+        promise
+
+    be _do_locate(addr: U32, promise: Promise[String]) =>
+        promise(_u16_to_country(_locate(addr)))
+
+    fun tag _u16_to_country(code: U16): String val =>
+        var ans = recover String(2) end
+        ans.push(U8.from[U16](code >> 8))
+        ans.push(U8.from[U16](code % 256))
+        ans
 
     fun ref _locate(addr: U32): U16 =>
         // Offset 1, because j could be -1 otherwise
