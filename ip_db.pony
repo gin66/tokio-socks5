@@ -15,7 +15,7 @@ actor IpDB
     new create(logger: Logger[String]) =>
         _logger = logger
 
-    be init_load(filename: FilePath) =>
+    be start_load(filename: FilePath) =>
         try
             let ip  = "\"(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)\""
             let rex = recover Regex(ip + "," + ip + ",\"([A-Z][A-Z])\"")? end

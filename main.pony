@@ -49,7 +49,7 @@ actor Main
       promise.next[None]({(ans:String) => 
             logger(Info) and logger.log("Located: " + ans.string()) })
 
-      ipdb.init_load(FilePath(auth,"dbip-country-2017-12.csv")?)
+      ipdb.start_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
       logger(Info) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
