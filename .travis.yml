@@ -27,8 +27,8 @@ matrix:
 install:
   - bash .travis_install.bash
 
-#script:
-#  - make test
+script:
+  - ponyc
 
 notifications:
   email:
