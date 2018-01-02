@@ -31,8 +31,10 @@ actor Node
     let _logger: Logger[String]
     let _id: U8
     let _name: String
-    let _static_udp: Array[InetAddrPort ref]
-    let _static_tcp: Array[InetAddrPort ref]
+    let _static_udp : Array[InetAddrPort ref]
+    let _static_tcp : Array[InetAddrPort ref]
+    // This node is reachable via client accessible socks proxy
+    let _socks_proxy: Array[InetAddrPort ref] = Array[InetAddrPort ref]
 
     new create(ipdb: IpDB tag,
                logger: Logger[String],
@@ -47,7 +49,6 @@ actor Node
         _name = consume name
         _static_tcp = consume static_tcp
         _static_udp = consume static_udp
-
 
         _logger(Info) and _logger.log("Create node: " + _name + " with id " + _id.string())
         if (_static_tcp.size() + _static_udp.size()) > 0 then
@@ -67,3 +68,6 @@ actor Node
     be located_at(country: String) =>
         _logger(Info) and _logger.log(_name + " is located in " + country.string())
 
+    be add_socks_proxy(ia: InetAddrPort iso) =>
+        _logger(Info) and _logger.log("Add socks proxy to reach " + _name + " using " + ia.string())
+        _socks_proxy.push(consume ia)

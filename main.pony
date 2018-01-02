@@ -2,6 +2,7 @@ use "net"
 use "logger"
 use "files"
 use "ini"
+use "collections"
 
 class MyUDPNotify is UDPNotify
   fun ref received(
@@ -53,39 +54,57 @@ actor Main
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
       let myID = sections("Self")?("myID")?.u8()?
-      for (id,name) in sections("Nodes")?.pairs() do
-        let id_num = id.u8()?
-        if id_num == myID then
-          env.out.print("Found my ID: "+name)
-        end
-        if sections.contains(name) then
-          let node = NodeBuilder(ipdb,id_num,name,logger)
-          for (key,value) in sections(name)?.pairs() do
-            match key
-            | "UDPAddresses" =>
-                for addr in value.split(",").values() do
-                  let ia = InetAddrPort.create_from_host_port(addr)?
-                  node.static_udp(consume ia)
-                end
-            | "TCPAddresses" =>
-                for addr in value.split(",").values() do
-                  let ia = InetAddrPort.create_from_host_port(addr)?
-                  node.static_tcp(consume ia)
-                end
-            | "Socks5Address" =>
-                if id_num == myID then
-                  let ia = InetAddrPort.create_from_host_port(value)?
-                  TCPListener(auth,
-                    recover SocksTCPListenNotify(resolver,logger) end, 
-                    ia.host_str(), ia.port_str() 
-                    where init_size=16384,max_size = 16384)
+      // Loop twice over the Nodes section. 
+      // First for other nodes and then for myself
+      let nodes = HashMap[U8,Node tag,HashIs[U8]]
+      for self in [false;true].values() do
+        for (id,name) in sections("Nodes")?.pairs() do
+          let id_num = id.u8()?
+          if (id_num == myID) == self then
+            if sections.contains(name) then
+              let node = NodeBuilder(ipdb,id_num,name,logger)
+              for (key,value) in sections(name)?.pairs() do
+                match key
+                | "UDPAddresses" =>
+                    for addr in value.split(",").values() do
+                      let ia = InetAddrPort.create_from_host_port(addr)?
+                      node.static_udp(consume ia)
+                    end
+                | "TCPAddresses" =>
+                    for addr in value.split(",").values() do
+                      let ia = InetAddrPort.create_from_host_port(addr)?
+                      node.static_tcp(consume ia)
+                    end
+                | "Socks5Address" =>
+                    let ia = InetAddrPort.create_from_host_port(value)?
+                    TCPListener(auth,
+                      recover SocksTCPListenNotify(resolver,logger) end, 
+                      ia.host_str(), ia.port_str() 
+                      where init_size=16384,max_size = 16384)
+                | "SocksProxy" =>
+                    if self then
+                      for proxy in value.split(",").values() do
+                        let ad_id = proxy.split_by("->")
+                        let addr  = ad_id(0)?
+                        let to_id = ad_id(1)?.u8()?
+                        try
+                          let node_actor = nodes(to_id)?
+                          let ia = InetAddrPort.create_from_host_port(addr)?
+                          node_actor.add_socks_proxy(consume ia)
+                        else
+                          env.out.print("Cannot find node for this proxy:"+addr.string())
+                        end
+                      end
+                    end
                 end
             end
+            let node_actor = node.build()
+              nodes.update(id_num,node_actor)
+            else
+              env.out.print("    No section for this node")
+              error
+            end
           end
-          node.build()
-        else
-          env.out.print("    No section for this node")
-          error
         end
       end
 
