@@ -18,7 +18,7 @@ class NodeBuilder
         _udp_addresses.push(consume addr)
 
     fun ref static_tcp(addr: InetAddrPort iso) =>
-        _udp_addresses.push(consume addr)
+        _tcp_addresses.push(consume addr)
 
     fun ref build() : Node tag =>
         let n = _name = recover "".string() end
