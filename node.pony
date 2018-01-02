@@ -33,6 +33,7 @@ actor Node
     let _name: String
     let _static_udp : Array[InetAddrPort ref]
     let _static_tcp : Array[InetAddrPort ref]
+    var _country: String = "ZZ"
     // This node is reachable via client accessible socks proxy
     let _socks_proxy: Array[InetAddrPort ref] = Array[InetAddrPort ref]
 
@@ -66,7 +67,14 @@ actor Node
         end
 
     be located_at(country: String) =>
-        _logger(Info) and _logger.log(_name + " is located in " + country.string())
+        if _country != country then
+            if _country != "ZZ" then
+                _logger(Error) and _logger.log("??? OLD LOCATION " + _country.string())
+            else
+                _logger(Info) and _logger.log(_name + " is located in " + country.string())
+            end
+            _country = country
+        end
 
     be add_socks_proxy(ia: InetAddrPort iso) =>
         _logger(Info) and _logger.log("Add socks proxy to reach " + _name + " using " + ia.string())
