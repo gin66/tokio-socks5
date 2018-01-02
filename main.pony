@@ -2,7 +2,6 @@ use "net"
 use "logger"
 use "files"
 use "ini"
-use "collections"
 
 class MyUDPNotify is UDPNotify
   fun ref received(
@@ -56,7 +55,7 @@ actor Main
       let myID = sections("Self")?("myID")?.u8()?
       // Loop twice over the Nodes section. 
       // First for other nodes and then for myself
-      let nodes = HashMap[U8,Node tag,HashIs[U8]]
+      let network = Network(logger)
       for self in [false;true].values() do
         for (id,name) in sections("Nodes")?.pairs() do
           let id_num = id.u8()?
@@ -87,19 +86,14 @@ actor Main
                         let ad_id = proxy.split_by("->")
                         let addr  = ad_id(0)?
                         let to_id = ad_id(1)?.u8()?
-                        try
-                          let node_actor = nodes(to_id)?
-                          let ia = InetAddrPort.create_from_host_port(addr)?
-                          node_actor.add_socks_proxy(consume ia)
-                        else
-                          env.out.print("Cannot find node for this proxy:"+addr.string())
-                        end
+                        let ia = InetAddrPort.create_from_host_port(addr)?
+                        network.add_socks_proxy(to_id,consume ia)
                       end
                     end
                 end
-            end
-            let node_actor = node.build()
-              nodes.update(id_num,node_actor)
+              end
+              let node_actor = node.build()
+              network.add_node(id_num,node_actor)
             else
               env.out.print("    No section for this node")
               error
