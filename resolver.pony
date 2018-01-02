@@ -67,6 +67,7 @@ actor Resolver
             socks_reply: Array[U8] iso) =>
         _logger(Info) and _logger.log("Called connect_to "+addr.string())
         conn.mute()
+        try socks_reply(1)? = Socks5.reply_ok() end
         let conn_peer = TCPConnection(_auth,
                             DirectForwardTCPConnectionNotify(conn,consume socks_reply,_logger),
                             addr.host_str(),
