@@ -77,12 +77,10 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
 
 class ForwardTCPConnectionNotify is TCPConnectionNotify
     let _logger:   Logger[String]
-    let _resolver: Resolver
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
 
-    new iso create(resolver: Resolver, logger: Logger[String]) =>
-        _resolver = resolver
+    new iso create(logger: Logger[String]) =>
         _logger   = logger
 
     fun ref received(

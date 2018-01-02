@@ -35,13 +35,13 @@ primitive Socks5
 
 class SocksTCPConnectionNotify is TCPConnectionNotify
     let _logger:   Logger[String]
-    let _resolver: Resolver
+    let _auth: AmbientAuth val
     var _state:    Socks5ServerState
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
 
-    new iso create(resolver: Resolver, logger: Logger[String]) =>
-        _resolver = resolver
+    new iso create(auth: AmbientAuth val, logger: Logger[String]) =>
+        _auth     = auth
         _logger   = logger
         _state    = Socks5WaitInit
 
@@ -98,9 +98,9 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             if data.size() != (atyp_len + 6) then
                 error
             end
-            // The resolver should call set_notify on actor conn.
+            // The dialer should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            _resolver.connect_to(conn,consume addr,consume data)
+            Dialer(_auth,_logger).connect_to(conn,consume addr,consume data)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")
@@ -137,14 +137,14 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
 
 class SocksTCPListenNotify is TCPListenNotify
     let _logger: Logger[String]
-    let _resolver: Resolver
+    let _auth: AmbientAuth val
 
-    new iso create(resolver: Resolver, logger: Logger[String]) =>
-        _resolver = resolver
+    new iso create(auth: AmbientAuth val, logger: Logger[String]) =>
+        _auth     = auth
         _logger   = logger
 
     fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-        SocksTCPConnectionNotify(_resolver, _logger)
+        SocksTCPConnectionNotify(_auth, _logger)
 
     fun ref listening(listen: TCPListener ref) =>
         _logger(Info) and _logger.log("Successfully bound to address")

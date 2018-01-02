@@ -1,13 +1,11 @@
 use "net"
 use "logger"
 
-actor Resolver
+actor Dialer
     let _logger: Logger[String]
-    let _auth: (AmbientAuth val | NetAuth val | TCPAuth val | 
-                TCPConnectAuth val)
+    let _auth: AmbientAuth val
 
-    new create(auth: (AmbientAuth val | NetAuth val | TCPAuth val | 
-               TCPConnectAuth val),
+    new create(auth: AmbientAuth val,
                logger: Logger[String]) =>
         _auth   = auth
         _logger = logger

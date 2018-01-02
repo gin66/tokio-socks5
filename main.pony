@@ -47,8 +47,6 @@ actor Main
       let ipdb = IpDB(logger)
       ipdb.start_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
-      let resolver = Resolver(auth,logger)
-
       logger(Info) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
@@ -77,7 +75,7 @@ actor Main
                 | "Socks5Address" =>
                     let ia = InetAddrPort.create_from_host_port(value)?
                     TCPListener(auth,
-                      recover SocksTCPListenNotify(resolver,logger) end, 
+                      recover SocksTCPListenNotify(auth,logger) end, 
                       ia.host_str(), ia.port_str() 
                       where init_size=16384,max_size = 16384)
                 | "SocksProxy" =>
