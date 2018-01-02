@@ -56,13 +56,19 @@ actor Main
       let sections = IniParse(ini_file.lines())?
       for (id,name) in sections("Nodes")?.pairs() do
         env.out.print("NODE ID=" + id + " is " + name)
+        let id_num = id.u8()?
         if sections.contains(name) then
           for (key,value) in sections(name)?.pairs() do
-            env.out.print("    " + key + " = " + value)
             match key
+            | "UDPAddresses" =>
+                for addr in value.split(",").values() do
+                  let ia = InetAddrPort.create_from_host_port(addr)?
+                  env.out.print("    UDP " + ia.string())
+                end
             | "TCPAddresses" =>
-                for addr in value.split("=").values() do
-                  env.out.print("    " + addr)
+                for addr in value.split(",").values() do
+                  let ia = InetAddrPort.create_from_host_port(addr)?
+                  env.out.print("    TCP " + ia.string())
                 end
             end
           end
