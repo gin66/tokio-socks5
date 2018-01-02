@@ -47,11 +47,17 @@ actor Main
       let ipdb = IpDB(logger)
       ipdb.start_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
+      let resolver = Resolver(auth,logger)
+
       logger(Info) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
+      let myID = sections("Self")?("myID")?.u8()?
       for (id,name) in sections("Nodes")?.pairs() do
         let id_num = id.u8()?
+        if id_num == myID then
+          env.out.print("Found my ID: "+name)
+        end
         if sections.contains(name) then
           let node = NodeBuilder(ipdb,id_num,name,logger)
           for (key,value) in sections(name)?.pairs() do
@@ -66,6 +72,14 @@ actor Main
                   let ia = InetAddrPort.create_from_host_port(addr)?
                   node.static_tcp(consume ia)
                 end
+            | "Socks5Address" =>
+                if id_num == myID then
+                  let ia = InetAddrPort.create_from_host_port(value)?
+                  TCPListener(auth,
+                    recover SocksTCPListenNotify(resolver,logger) end, 
+                    ia.host_str(), ia.port_str() 
+                    where init_size=16384,max_size = 16384)
+                end
             end
           end
           node.build()
@@ -75,10 +89,5 @@ actor Main
         end
       end
 
-      let resolver = Resolver(auth,logger)
       UDPSocket(auth, MyUDPNotify, "", "8989")
-      TCPListener(auth,
-        recover SocksTCPListenNotify(resolver,logger) end, 
-        "127.0.0.1", "8989" 
-        where init_size=16384,max_size = 16384)
     end
