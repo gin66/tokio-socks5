@@ -5,6 +5,10 @@ use "promises"
 use "collections"
 
 actor IpDB
+    """
+    the private IP addresses resolve to ZZ
+    """
+
     var db_from : Array[U32] = Array[U32](460589)
     var db_to   : Array[U32] = Array[U32](460589)
     var cn      : Array[U16] = Array[U16](460589)

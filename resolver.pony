@@ -35,6 +35,13 @@ class InetAddrPort is Stringable
             end
         end
 
+    fun box u32() : U32 =>
+        (let ip1,let ip2,let ip3,let ip4) = ip
+        (U32.from[U8](ip1)<<24)
+        + (U32.from[U8](ip2)<<16)
+        + (U32.from[U8](ip3)<<8)
+        + U32.from[U8](ip4)
+
     fun box host_str() : String iso^ =>
         host.string()
 

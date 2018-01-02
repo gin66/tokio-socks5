@@ -45,33 +45,30 @@ actor Main
 
       // Only clients need to load ip database !!!
       let ipdb = IpDB(logger)
-      let promise = ipdb.locate(1047275918)
-      promise.next[None]({(ans:String) => 
-            logger(Info) and logger.log("Located: " + ans.string()) })
-
       ipdb.start_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
       logger(Info) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
       for (id,name) in sections("Nodes")?.pairs() do
-        env.out.print("NODE ID=" + id + " is " + name)
         let id_num = id.u8()?
         if sections.contains(name) then
+          let node = NodeBuilder(ipdb,id_num,name,logger)
           for (key,value) in sections(name)?.pairs() do
             match key
             | "UDPAddresses" =>
                 for addr in value.split(",").values() do
                   let ia = InetAddrPort.create_from_host_port(addr)?
-                  env.out.print("    UDP " + ia.string())
+                  node.static_udp(consume ia)
                 end
             | "TCPAddresses" =>
                 for addr in value.split(",").values() do
                   let ia = InetAddrPort.create_from_host_port(addr)?
-                  env.out.print("    TCP " + ia.string())
+                  node.static_tcp(consume ia)
                 end
             end
           end
+          node.build()
         else
           env.out.print("    No section for this node")
           error
