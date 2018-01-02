@@ -5,8 +5,12 @@ use "logger"
 primitive Socks5WaitInit
 primitive Socks5WaitRequest
 primitive Socks5WaitConnect
+primitive Socks5NeedInit
+primitive Socks5NeedRequest
+primitive Socks5PassThrough
 
-type Socks5State is (Socks5WaitInit | Socks5WaitRequest | Socks5WaitConnect)
+type Socks5ClientState is (Socks5NeedInit | Socks5NeedRequest | Socks5PassThrough)
+type Socks5ServerState is (Socks5WaitInit | Socks5WaitRequest | Socks5WaitConnect)
 
 primitive Socks5
     fun version():U8 => 5
@@ -32,7 +36,7 @@ primitive Socks5
 class SocksTCPConnectionNotify is TCPConnectionNotify
     let _logger:   Logger[String]
     let _resolver: Resolver
-    var _state:    Socks5State
+    var _state:    Socks5ServerState
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
 
@@ -150,3 +154,105 @@ class SocksTCPListenNotify is TCPListenNotify
 
     fun ref closed(listen: TCPListener ref) =>
         _logger(Info) and _logger.log("Successfully closed TCP listeners")
+
+
+class Socks5ForwardTCPConnectionNotify is TCPConnectionNotify
+    let _logger:    Logger[String]
+    let _peer:      TCPConnection
+    var _state:     Socks5ClientState
+    var _conn_data: Array[U8] iso
+    var _tx_bytes:  USize = 0
+    var _rx_bytes:  USize = 0
+
+    new iso create(peer: TCPConnection, 
+                   is_proxy: Bool,
+                   conn_data: Array[U8] iso,
+                   logger: Logger[String]) =>
+        _peer      = peer
+        _conn_data = consume conn_data
+        _logger    = logger
+        _state     = (if is_proxy then
+                          Socks5NeedInit
+                      else
+                          Socks5PassThrough
+                      end)
+
+    fun ref connect_failed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection failed")
+        if _conn_data.size() > 0 then
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let data = _conn_data = consume empty
+            try data(1)? = Socks5.reply_conn_refused() end
+            _peer.write(consume data)
+        end
+        _peer.dispose()
+
+    fun ref connected(conn: TCPConnection ref) =>
+        match _state
+        | Socks5NeedInit =>
+            conn.write([Socks5.version();1;Socks5.meth_no_auth()])
+            _state = Socks5NeedRequest
+        | Socks5PassThrough =>
+            if _conn_data.size() > 0 then
+                let empty: Array[U8] iso = recover iso Array[U8]() end
+                let data = _conn_data = consume empty
+                try data(1)? = Socks5.reply_ok() end
+                _peer.write(consume data)
+            end
+        end
+
+    fun ref received(
+            conn: TCPConnection ref,
+            data: Array[U8] iso,
+            times: USize)
+            : Bool =>
+        match _state
+        | Socks5NeedRequest =>
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let cdata = _conn_data = consume empty
+            var target = _peer
+            try
+                if data.size() != 2 then error end
+                if data(0)? != Socks5.version() then error end
+                if data(1)? != Socks5.meth_no_auth() then error end
+                target = conn
+            else
+                try cdata(1)? = Socks5.reply_general_error() end
+            end
+            target.write(consume cdata)
+            _state = Socks5PassThrough
+        | Socks5PassThrough =>
+            if data.size() > 0 then
+                _rx_bytes = _rx_bytes + data.size()
+                _peer.write(consume data)
+            else
+                _peer.write(consume data)
+                conn.dispose()
+            end
+        end
+        false
+
+    fun ref sent(
+            conn: TCPConnection ref,
+            data: (String val | Array[U8] val))
+            : (String val | Array[U8 val] val) =>
+        if data.size() == 0 then
+            _logger(Info) and _logger.log("sent empty")
+            conn.close()
+        end
+        _tx_bytes = _tx_bytes + data.size()
+        data
+
+    fun ref throttled(conn: TCPConnection ref) =>
+        _peer.mute()
+
+    fun ref unthrottled(conn: TCPConnection ref) =>
+        _peer.unmute()
+
+    fun ref accepted(conn: TCPConnection ref) =>
+        None
+
+    fun ref closed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        let empty: Array[U8] iso = recover iso Array[U8]() end
+        _peer.write(consume empty)

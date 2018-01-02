@@ -44,9 +44,12 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
     data
 
     fun ref connected(conn: TCPConnection ref) =>
-        let empty: Array[U8] iso = recover iso Array[U8]() end
-        let data = _conn_data = consume empty
-        _peer.write(consume data)
+        if _conn_data.size() > 0 then
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let data = _conn_data = consume empty
+            try data(1)? = Socks5.reply_ok() end
+            _peer.write(consume data)
+        end
 
     fun ref throttled(conn: TCPConnection ref) =>
         _peer.mute()
@@ -59,6 +62,12 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
 
     fun ref connect_failed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection failed")
+        if _conn_data.size() > 0 then
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let data = _conn_data = consume empty
+            try data(1)? = Socks5.reply_conn_refused() end
+            _peer.write(consume data)
+        end
         _peer.dispose()
 
     fun ref closed(conn: TCPConnection ref) =>
