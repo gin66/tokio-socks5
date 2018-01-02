@@ -4,14 +4,16 @@ class NodeBuilder
     let _ipdb: IpDB tag
     let _logger: Logger[String]
     let _id: U8
+    let _self: Bool
     var _name: String iso
     var _udp_addresses: Array[InetAddrPort ref] iso = recover Array[InetAddrPort ref] end
     var _tcp_addresses: Array[InetAddrPort ref] iso = recover Array[InetAddrPort ref] end
 
-    new iso create(ipdb: IpDB tag, id: U8, name: String, logger: Logger[String]) =>
+    new iso create(ipdb: IpDB tag, id: U8, self: Bool, name: String, logger: Logger[String]) =>
         _ipdb = ipdb
         _logger = logger
         _id = id
+        _self = self
         _name = recover iso name.string() end
 
     fun ref static_udp(addr: InetAddrPort iso) =>
@@ -24,12 +26,13 @@ class NodeBuilder
         let n = _name = recover "".string() end
         let t = _tcp_addresses = recover Array[InetAddrPort ref] end
         let u = _udp_addresses = recover Array[InetAddrPort ref] end
-        Node(_ipdb,_logger, _id, consume n, consume t, consume u)
+        Node(_ipdb,_logger, _id, _self, consume n, consume t, consume u)
 
 actor Node
     let _ipdb: IpDB tag
     let _logger: Logger[String]
     let _id: U8
+    let _self: Bool
     let _name: String
     let _static_udp : Array[InetAddrPort ref]
     let _static_tcp : Array[InetAddrPort ref]
@@ -40,6 +43,7 @@ actor Node
     new create(ipdb: IpDB tag,
                logger: Logger[String],
                id: U8,
+               self: Bool,
                name: String iso,
                static_tcp: Array[InetAddrPort ref] iso,
                static_udp: Array[InetAddrPort ref] iso
@@ -47,6 +51,7 @@ actor Node
         _ipdb = ipdb
         _logger = logger
         _id = id
+        _self = self
         _name = consume name
         _static_tcp = consume static_tcp
         _static_udp = consume static_udp

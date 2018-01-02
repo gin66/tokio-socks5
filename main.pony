@@ -61,7 +61,7 @@ actor Main
           let id_num = id.u8()?
           if (id_num == myID) == self then
             if sections.contains(name) then
-              let node = NodeBuilder(ipdb,id_num,name,logger)
+              let node = NodeBuilder(ipdb,id_num, self, name,logger)
               for (key,value) in sections(name)?.pairs() do
                 match key
                 | "UDPAddresses" =>
@@ -92,8 +92,7 @@ actor Main
                     end
                 end
               end
-              let node_actor = node.build()
-              network.add_node(id_num,node_actor)
+              network.add_node(id_num,node.build())
             else
               env.out.print("    No section for this node")
               error
