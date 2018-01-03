@@ -35,12 +35,13 @@ actor Dialer
     connected in step #1. In case both are dead, then failover to UDP/TCP channel
     to be done.
     """
-    let _logger:  Logger[String]
-    let _auth:    AmbientAuth val
-    let _conn:    TCPConnection tag
-    let _conns:   Array[TCPConnection tag] = Array[TCPConnection tag]
-    let _addr:    InetAddrPort iso
-    var _request: Array[U8] iso
+    let _logger:    Logger[String]
+    let _auth:      AmbientAuth val
+    let _conn:      TCPConnection tag
+    let _conns:     Array[TCPConnection tag] = Array[TCPConnection tag]
+    var _request:   Array[U8] iso
+    var _connected: Bool = false
+    var _count:     U8 = 0
 
     new create(auth: AmbientAuth val,
                conn: TCPConnection tag,
@@ -49,18 +50,17 @@ actor Dialer
                logger: Logger[String]) =>
         _auth    = auth
         _logger  = logger
-        _addr    = consume addr
         _conn    = conn
         _request = consume socks_request
 
-        //connect_direct()
+        connect_direct(consume addr)
         try
             let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40005")? end
             let proxies    = recover iso [proxy_addr] end
-            connect_socks5_to(consume proxies)
+            //connect_socks5_to(consume proxies)
         end
 
-    be connect_direct() =>
+    be connect_direct(addr: InetAddrPort val) =>
         _conn.mute()
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let req = _request = consume empty
@@ -68,8 +68,8 @@ actor Dialer
                             DirectForwardTCPConnectionNotify(_conn,
                                                              consume req,
                                                              _logger),
-                                _addr.host_str(),
-                                _addr.port_str()
+                                addr.host_str(),
+                                addr.port_str()
                                 where init_size=16384,max_size = 16384)
         _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
         _conn.unmute()
@@ -81,6 +81,7 @@ actor Dialer
                             addr.host_str(),
                             addr.port_str()
                             where init_size=16384,max_size = 16384)
+            _count = _count + 1
         end
 
     be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
@@ -88,19 +89,28 @@ actor Dialer
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
         """
-        _conn.mute()
-        peer.mute()
-        peer .set_notify(DirectForwardTCPConnectionNotify(_conn where logger = _logger))
-        _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
-        _conn.unmute()
-        peer.unmute()
-        let empty: Array[U8] iso = recover iso Array[U8]() end
-        let data = _request = consume empty
-        //try data(1)? = Socks5.reply_conn_refused() end
-        peer.write(consume data)
+        _count = _count - 1
+        if _connected then
+            peer.dispose()
+        else
+            _connected = true
+            _conn.mute()
+            peer.mute()
+            peer .set_notify(DirectForwardTCPConnectionNotify(_conn where logger = _logger))
+            _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
+            _conn.unmute()
+            peer.unmute()
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let data = _request = consume empty
+            //try data(1)? = Socks5.reply_conn_refused() end
+            peer.write(consume data)
+        end
 
     be outgoing_socks_connection_failed(conn: TCPConnection) => 
-        None
+        _count = _count - 1
+        if (_count == 0) and not _connected then
+            _conn.dispose()
+        end
     
     be resolve() =>
         None

@@ -50,7 +50,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
     try 
         _rx_bytes = _rx_bytes + data.size()
         for i in Range(0,data.size()) do
-            _logger(Info) and _logger.log(i.string()+":"+data(i)?.string())
+            _logger(Fine) and _logger.log(i.string()+":"+data(i)?.string())
         end
         match _state
         | Socks5WaitInit =>
