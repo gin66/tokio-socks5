@@ -50,7 +50,7 @@ actor Chooser
 
     be select_connection(dialer: Dialer,addr: InetAddrPort val) =>
         """
-        select_connection should first decide on the node first.
+        select_connection should first decide on the node.
         In a second step the connection method to be determined.
         => For this the related node can be asked for the available methods.
 

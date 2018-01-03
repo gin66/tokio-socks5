@@ -44,79 +44,77 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
         _state    = Socks5WaitInit
 
     fun ref received(
-        conn: TCPConnection ref,
-        data: Array[U8] iso,
-        times: USize)
-        : Bool
-    =>
-    try 
-        _rx_bytes = _rx_bytes + data.size()
-        for i in Range(0,data.size()) do
-            _logger(Fine) and _logger.log(i.string()+":"+data(i)?.string())
-        end
-        match _state
-        | Socks5WaitInit =>
-            _logger(Info) and _logger.log("Received handshake")
-            if data(0)? != Socks5.version() then error end
-            if data.size() != (USize.from[U8](data(1)?) + 2) then error end
-            data.find(Socks5.meth_no_auth(), 2)?
-            _logger(Info) and _logger.log("Send initial response")
-            conn.write([Socks5.version();Socks5.meth_no_auth()])
-            _state = Socks5WaitRequest
-        | Socks5WaitRequest =>
-            _logger(Info) and _logger.log("Received address")
-            if data(0)? != Socks5.version() then error end
-            if data(1)? != Socks5.cmd_connect() then
-                data(1)? = Socks5.reply_cmd_not_supported()
-                conn.write(consume data)
-                error
+            conn: TCPConnection ref,
+            data: Array[U8] iso,
+            times: USize)
+            : Bool =>
+        try 
+            _rx_bytes = _rx_bytes + data.size()
+            for i in Range(0,data.size()) do
+                _logger(Fine) and _logger.log(i.string()+":"+data(i)?.string())
             end
-            var atyp_len: USize = 0
-            var port: U16 = U16.from[U8](data(data.size()-2)?)
-            port = (port * 256) + U16.from[U8](data(data.size()-1)?)
-            var addr: InetAddrPort iso
-            match data(3)?
-            | Socks5.atyp_ipv4()   => 
-                atyp_len = 4
-                let ip  = (data(4)?,data(5)?,data(6)?,data(7)?)
-                addr = InetAddrPort(ip,port)
-            | Socks5.atyp_domain() => 
-                let astr_len = USize.from[U8](data(4)?)
-                atyp_len = astr_len + 1
-                var dest : String iso = recover iso String end
-                for i in Range(0,atyp_len-1) do
-                    dest.push(data(5+i)?)
+            match _state
+            | Socks5WaitInit =>
+                _logger(Info) and _logger.log("Received handshake")
+                if data(0)? != Socks5.version() then error end
+                if data.size() != (USize.from[U8](data(1)?) + 2) then error end
+                data.find(Socks5.meth_no_auth(), 2)?
+                _logger(Info) and _logger.log("Send initial response")
+                conn.write([Socks5.version();Socks5.meth_no_auth()])
+                _state = Socks5WaitRequest
+            | Socks5WaitRequest =>
+                _logger(Info) and _logger.log("Received address")
+                if data(0)? != Socks5.version() then error end
+                if data(1)? != Socks5.cmd_connect() then
+                    data(1)? = Socks5.reply_cmd_not_supported()
+                    conn.write(consume data)
+                    error
                 end
-                addr  = InetAddrPort.create_from_string(consume dest,port)
-            else
-                data(1)? = Socks5.reply_atyp_not_supported()
-                conn.write(consume data)
+                var atyp_len: USize = 0
+                var port: U16 = U16.from[U8](data(data.size()-2)?)
+                port = (port * 256) + U16.from[U8](data(data.size()-1)?)
+                var addr: InetAddrPort iso
+                match data(3)?
+                | Socks5.atyp_ipv4()   => 
+                    atyp_len = 4
+                    let ip  = (data(4)?,data(5)?,data(6)?,data(7)?)
+                    addr = InetAddrPort(ip,port)
+                | Socks5.atyp_domain() => 
+                    let astr_len = USize.from[U8](data(4)?)
+                    atyp_len = astr_len + 1
+                    var dest : String iso = recover iso String end
+                    for i in Range(0,atyp_len-1) do
+                        dest.push(data(5+i)?)
+                    end
+                    addr  = InetAddrPort.create_from_string(consume dest,port)
+                else
+                    data(1)? = Socks5.reply_atyp_not_supported()
+                    conn.write(consume data)
+                    error
+                end
+                if data.size() != (atyp_len + 6) then
+                    error
+                end
+                // The dialer should call set_notify on actor conn.
+                // This means, no more communication should happen with this notifier
+                Dialer(_auth,_chooser,conn,consume addr,consume data,_logger)
+                _state = Socks5WaitConnect
+            | Socks5WaitConnect=>
+                _logger(Info) and _logger.log("Received data, while waiting for connection")
                 error
+                //conn.write(String.from_array(consume data))
             end
-            if data.size() != (atyp_len + 6) then
-                error
-            end
-            // The dialer should call set_notify on actor conn.
-            // This means, no more communication should happen with this notifier
-            Dialer(_auth,_chooser,conn,consume addr,consume data,_logger)
-            _state = Socks5WaitConnect
-        | Socks5WaitConnect=>
-            _logger(Info) and _logger.log("Received data, while waiting for connection")
-            error
-            //conn.write(String.from_array(consume data))
+        else
+            conn.dispose()
         end
-    else
-        conn.dispose()
-    end
-    false
+        false
 
     fun ref sent(
-        conn: TCPConnection ref,
-        data: (String val | Array[U8] val))
-        : (String val | Array[U8 val] val)
-    =>
-    _tx_bytes = _tx_bytes + data.size()
-    data
+            conn: TCPConnection ref,
+            data: (String val | Array[U8] val))
+            : (String val | Array[U8 val] val) =>
+        _tx_bytes = _tx_bytes + data.size()
+        data
 
     fun ref throttled(conn: TCPConnection ref) =>
         None
