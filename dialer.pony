@@ -35,8 +35,9 @@ actor Dialer
     connected in step #1. In case both are dead, then failover to UDP/TCP channel
     to be done.
     """
-    let _logger:    Logger[String]
     let _auth:      AmbientAuth val
+    let _chooser:   Chooser
+    let _logger:    Logger[String]
     let _conn:      TCPConnection tag
     let _conns:     Array[TCPConnection tag] = Array[TCPConnection tag]
     var _request:   Array[U8] iso
@@ -44,21 +45,17 @@ actor Dialer
     var _count:     U8 = 0
 
     new create(auth: AmbientAuth val,
+               chooser: Chooser,
                conn: TCPConnection tag,
                addr: InetAddrPort iso,
                socks_request: Array[U8] iso,
                logger: Logger[String]) =>
         _auth    = auth
+        _chooser = chooser
         _logger  = logger
         _conn    = conn
         _request = consume socks_request
-
-        connect_direct(consume addr)
-        try
-            let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40005")? end
-            let proxies    = recover iso [proxy_addr] end
-            //connect_socks5_to(consume proxies)
-        end
+        _chooser.select_connection(this, consume addr)
 
     be connect_direct(addr: InetAddrPort val) =>
         _conn.mute()
@@ -116,7 +113,3 @@ actor Dialer
             end
             _conn.dispose()
         end
-    
-    be resolve() =>
-        None
-    

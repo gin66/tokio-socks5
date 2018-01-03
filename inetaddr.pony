@@ -45,5 +45,9 @@ class InetAddrPort is Stringable
     fun box port_str() : String iso^ =>
         port.string()
 
+    fun box is_ipv4() : Bool =>
+        (let ip1,let ip2,let ip3,let ip4) = ip
+        (ip1 + ip2 + ip3 + ip4) == 0
+
     fun box string() : String iso^ =>
         (host + ":" + port.string()).string()

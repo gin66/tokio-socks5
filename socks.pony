@@ -30,14 +30,16 @@ primitive Socks5
     fun reply_atyp_not_supported():U8 => 8
 
 class SocksTCPConnectionNotify is TCPConnectionNotify
+    let _auth:     AmbientAuth val
+    let _chooser:  Chooser
     let _logger:   Logger[String]
-    let _auth: AmbientAuth val
     var _state:    Socks5ServerState
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
 
-    new iso create(auth: AmbientAuth val, logger: Logger[String]) =>
+    new iso create(auth: AmbientAuth val, chooser: Chooser, logger: Logger[String]) =>
         _auth     = auth
+        _chooser  = chooser
         _logger   = logger
         _state    = Socks5WaitInit
 
@@ -96,7 +98,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             end
             // The dialer should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            Dialer(_auth,conn,consume addr,consume data,_logger)
+            Dialer(_auth,_chooser,conn,consume addr,consume data,_logger)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")
@@ -132,15 +134,17 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
         _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
 
 class SocksTCPListenNotify is TCPListenNotify
-    let _logger: Logger[String]
     let _auth: AmbientAuth val
+    let _chooser: Chooser
+    let _logger: Logger[String]
 
-    new iso create(auth: AmbientAuth val, logger: Logger[String]) =>
+    new iso create(auth: AmbientAuth val, chooser: Chooser, logger: Logger[String]) =>
         _auth     = auth
+        _chooser  = chooser
         _logger   = logger
 
     fun ref connected(listen: TCPListener ref): TCPConnectionNotify iso^ =>
-        SocksTCPConnectionNotify(_auth, _logger)
+        SocksTCPConnectionNotify(_auth, _chooser, _logger)
 
     fun ref listening(listen: TCPListener ref) =>
         _logger(Info) and _logger.log("Successfully bound to address")

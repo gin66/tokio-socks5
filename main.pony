@@ -51,9 +51,13 @@ actor Main
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
       let myID = sections("Self")?("myID")?.u8()?
+
+      let network = Network(logger)
+      // Only clients need a chooser !!!
+      let chooser = Chooser(network)
+
       // Loop twice over the Nodes section. 
       // First for other nodes and then for myself
-      let network = Network(logger)
       for self in [false;true].values() do
         for (id,name) in sections("Nodes")?.pairs() do
           let id_num = id.u8()?
@@ -75,7 +79,7 @@ actor Main
                 | "Socks5Address" =>
                     let ia = InetAddrPort.create_from_host_port(value)?
                     TCPListener(auth,
-                      recover SocksTCPListenNotify(auth,logger) end, 
+                      recover SocksTCPListenNotify(auth, chooser,logger) end, 
                       ia.host_str(), ia.port_str() 
                       where init_size=16384,max_size = 16384)
                 | "SocksProxy" =>
