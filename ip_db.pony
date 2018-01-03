@@ -81,7 +81,9 @@ actor IpDB
 
     be _do_locate(addr: U32, promise: Promise[String]) =>
         if _is_loaded then
-            promise(_u16_to_country(_locate(addr)))
+            let country = _u16_to_country(_locate(addr))
+            _logger(Fine) and _logger.log("Country for " + addr.string() + " is " + country)
+            promise(country)
         else
             _pending.push( (addr,promise) )
         end

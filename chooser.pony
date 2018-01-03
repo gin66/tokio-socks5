@@ -28,11 +28,13 @@ actor Chooser
     """
     let _logger :   Logger[String]
     let _network:   Network
+    let _ipdb:      IpDB
     let _requests:  Map[String,Promise[Resolve]]
     let _myCountry: String
 
-    new create(network: Network, myCountry: String, logger: Logger[String]) =>
+    new create(network: Network, ipdb: IpDB, myCountry: String, logger: Logger[String]) =>
         _network   = network
+        _ipdb      = ipdb
         _logger    = logger
         _requests  = Map[String,Promise[Resolve]]
         _myCountry = myCountry
@@ -96,16 +98,32 @@ actor Chooser
                     _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")
                     p(DirectConnection)
                     return
-                else   
-                    _logger(Info) and _logger.log(hostname + " => " + parts(parts.size()-1)?)
                 end
+                _logger(Info) and _logger.log(hostname + " => PROXY, no alternative in start_selection")
+                let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
+                let proxies    = recover iso [proxy_addr] end
+                p(consume proxies)
             end
         else
             let ip = addr.u32()
+            let prom = _ipdb.locate(ip)
+            let me = recover this~selected_on_ip(p,ip) end
+            _logger(Info) and _logger.log("Find out country for " + ip.string())
+            prom.next[None]({(dest_country: String)(c=consume me) =>
+                c(dest_country)
+            })
         end
 
-
+    be selected_on_ip(p:Promise[Resolve],ip: U32,dest_country: String) =>
         try
+            _logger(Info) and _logger.log(ip.string() + " => country: " + dest_country)
+            if _myCountry == dest_country then
+                _logger(Info) and _logger.log(ip.string() + " => DIRECT, because of country")
+                p(DirectConnection)
+                return
+            end
+
+            _logger(Info) and _logger.log(ip.string() + " => PROXY, no alternative in selected_on_ip")
             let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
             let proxies    = recover iso [proxy_addr] end
             p(consume proxies)
