@@ -66,7 +66,9 @@ actor Main
             if sections.contains(name) then
               let node = NodeBuilder(ipdb,id_num, self, name,logger)
               for (key,value) in sections(name)?.pairs() do
-                match key
+                let composite = key.split_by("->")
+                let first = try composite(0)? else "" end
+                match first
                 | "UDPAddresses" =>
                     for addr in value.split(",").values() do
                       let ia = InetAddrPort.create_from_host_port(addr)?
@@ -85,10 +87,8 @@ actor Main
                       where init_size=16384,max_size = 16384)
                 | "SocksProxy" =>
                     if self then
-                      for proxy in value.split(",").values() do
-                        let ad_id = proxy.split_by("->")
-                        let addr  = ad_id(0)?
-                        let to_id = ad_id(1)?.u8()?
+                      let to_id = composite(1)?.u8()?
+                      for addr in value.split(",").values() do
                         let ia = InetAddrPort.create_from_host_port(addr)?
                         network.add_socks_proxy(to_id,consume ia)
                       end
@@ -103,6 +103,8 @@ actor Main
           end
         end
       end
+
+      network.display()
 
       UDPSocket(auth, MyUDPNotify, "", "8989")
     end
