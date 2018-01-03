@@ -51,10 +51,11 @@ actor Main
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
       let myID = sections("Self")?("myID")?.u8()?
+      let myCountry = sections("Self")?("myCountry")?
 
       let network = Network(logger)
       // Only clients need a chooser !!!
-      let chooser = Chooser(network,logger)
+      let chooser = Chooser(network,myCountry,logger)
 
       // Loop twice over the Nodes section. 
       // First for other nodes and then for myself

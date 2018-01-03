@@ -38,6 +38,7 @@ actor Dialer
     let _auth:      AmbientAuth val
     let _chooser:   Chooser
     let _logger:    Logger[String]
+    let _addr:      InetAddrPort val
     let _conn:      TCPConnection tag
     let _conns:     Array[TCPConnection tag] = Array[TCPConnection tag]
     var _request:   Array[U8] iso
@@ -54,8 +55,9 @@ actor Dialer
         _chooser = chooser
         _logger  = logger
         _conn    = conn
+        _addr    = consume addr
         _request = consume socks_request
-        _chooser.select_connection(this, consume addr)
+        _chooser.select_connection(this, _addr)
     
     be select_timeout() =>
         let empty: Array[U8] iso = recover iso Array[U8]() end
@@ -66,7 +68,7 @@ actor Dialer
         end
         _conn.dispose()
 
-    be connect_direct(addr: InetAddrPort val) =>
+    be connect_direct() =>
         _conn.mute()
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let req = _request = consume empty
@@ -74,8 +76,8 @@ actor Dialer
                             DirectForwardTCPConnectionNotify(_conn,
                                                              consume req,
                                                              _logger),
-                                addr.host_str(),
-                                addr.port_str()
+                                _addr.host_str(),
+                                _addr.port_str()
                                 where init_size=16384,max_size = 16384)
         _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
         _conn.unmute()

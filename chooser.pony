@@ -2,7 +2,8 @@ use "logger"
 use "promises"
 use "collections"
 
-type Resolve is (InetAddrPort val | Array[InetAddrPort val] val)
+primitive DirectConnection
+type Resolve is (DirectConnection | Array[InetAddrPort val] val)
 
 actor Chooser
     """
@@ -25,21 +26,23 @@ actor Chooser
     If two connections are established to same destination, the determination
     need to be done only once.
     """
-    let _logger :  Logger[String]
-    let _network:  Network
-    let _requests: Map[String,Promise[Resolve]]
+    let _logger :   Logger[String]
+    let _network:   Network
+    let _requests:  Map[String,Promise[Resolve]]
+    let _myCountry: String
 
-    new create(network: Network, logger: Logger[String]) =>
-        _network  = network
-        _logger   = logger
-        _requests = Map[String,Promise[Resolve]]
+    new create(network: Network, myCountry: String, logger: Logger[String]) =>
+        _network   = network
+        _logger    = logger
+        _requests  = Map[String,Promise[Resolve]]
+        _myCountry = myCountry
 
     be remove_promise(hstr: String) =>
         try 
             _requests.remove(hstr)?
         end
 
-    be select_connection(dialer: Dialer,addr: InetAddrPort iso) =>
+    be select_connection(dialer: Dialer,addr: InetAddrPort val) =>
         _logger(Info) and _logger.log("select path for destination " + addr.string())
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
@@ -50,24 +53,27 @@ actor Chooser
             else
                 let pnew = Promise[Resolve]
                 _requests(hstr) = pnew
+                _logger(Info) and _logger.log("Have " + 
+                    _requests.size().string() + " cached values")
                 pnew.timeout(5_000_000_000) // MAGIC NUMBER
                 let me = recover tag this end
                 pnew.next[Resolve]({(r:Resolve) =>
                     // Use Map as cache for previous results. Not sure, if good or bad
+                    // In general this is quite elegant :-)
                     //me.remove_promise(hstr)
                     r
                 },{()? =>
                     me.remove_promise(hstr)
                     error 
                 })
-                start_selection(pnew,consume addr)
+                start_selection(pnew,addr)
                 pnew
             end)
 
         p.next[Resolve]({(r:Resolve) => 
             match r
-            | let addr: InetAddrPort val =>
-                dialer.connect_direct(addr)
+            | DirectConnection =>
+                dialer.connect_direct()
             | let proxies: Array[InetAddrPort val] val =>
                 dialer.connect_socks5_to(proxies)
             end
@@ -78,14 +84,18 @@ actor Chooser
         })
 
     be start_selection(p:Promise[Resolve],addr: InetAddrPort val) =>
+        _logger(Info) and _logger.log("select path for destination " + addr.string())
         if addr.has_real_name then
-            _logger(Info) and _logger.log("select path for destination " + addr.string())
+            let hostname = addr.host_str()
+            None
+        else
+            let ip = addr.u32()
         end
 
-        p(addr)
+        //p(DirectConnection)
 
         try
-            let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40005")? end
+            let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
             let proxies    = recover iso [proxy_addr] end
-            //dialer.connect_socks5_to(consume proxies)
+            p(consume proxies)
         end
