@@ -210,7 +210,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
                 let delta_ms = Time.millis() - _start
-                _logger(Info) and _logger.log("Connected used ms: " + delta_ms.string())
+                _dialer.outgoing_socks_connection_established(delta_ms)
                 _state = Socks5PassThrough
                 _peer.write(consume data)
                 return false

@@ -119,5 +119,9 @@ actor Dialer
         peer.write(consume x)
         _logger(Info) and _logger.log("Sent request to socks proxy")
 
+    be outgoing_socks_connection_established(used_time_ms: U64) => 
+        _logger(Info) and _logger.log("Connected used ms: " + used_time_ms.string())
+    
+
     be outgoing_socks_connection_failed(conn: TCPConnection) => 
         try_next_proxy()
