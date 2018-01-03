@@ -14,7 +14,7 @@ actor Dialer
 
     The difference between direct outgoing connection and socks5-proxy is:
             1. The socks5-proxy has to perform the initial socks5 greeting:
-                    Exchange of two identical messages \x05\x01\x00
+                    Send message \x05\x01\x00 and expect message \x05\x00
             2. The Socks5 request from the incoming connection can then be sent:
                     a) direct connection: send back to client
                        What ever comes first:
@@ -34,8 +34,6 @@ actor Dialer
     In case of two proxies to the same node, actually both socks5-proxies can be
     connected in step #1. In case both are dead, then failover to UDP/TCP channel
     to be done.
-
-    Unclear is, which solution is better: one actor and many structs vs many actors.
     """
     let _logger:  Logger[String]
     let _auth:    AmbientAuth val
@@ -55,11 +53,11 @@ actor Dialer
         _conn    = conn
         _request = consume socks_request
 
-        _logger(Info) and _logger.log("Called connect_to "+_addr.string())
-        connect_direct()
+        //connect_direct()
         try
-            let proxy_addr = InetAddrPort.create_from_host_port("127.0.0.1:40005")?
-            //connect_socks5_to(conn,consume proxy_addr,consume socks_request)
+            let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40005")? end
+            let proxies    = recover iso [proxy_addr] end
+            connect_socks5_to(consume proxies)
         end
 
     be connect_direct() =>
@@ -76,20 +74,34 @@ actor Dialer
         _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
         _conn.unmute()
 
-    be connect_socks5_to(conn: TCPConnection tag,
-            addr: InetAddrPort iso,
-            socks_request: Array[U8] iso) =>
-        _conn.mute()
-        let conn_peer = TCPConnection(_auth,
-                            Socks5ForwardTCPConnectionNotify(_conn,true,
-                                consume socks_request,
-                                _logger),
-                                _addr.host_str(),
-                                _addr.port_str()
-                                where init_size=16384,max_size = 16384)
-        _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
-        _conn.unmute()
+    be connect_socks5_to(proxies: Array[InetAddrPort val] val) =>
+        for addr in proxies.values() do
+            let conn_peer = TCPConnection(_auth,
+                            Socks5OutgoingTCPConnectionNotify(this,_logger),
+                            addr.host_str(),
+                            addr.port_str()
+                            where init_size=16384,max_size = 16384)
+        end
 
+    be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
+        """
+        Connection to a socks proxy has succeeded. Send him the original socks_request.
+        All else is just protocol
+        """
+        _conn.mute()
+        peer.mute()
+        peer .set_notify(DirectForwardTCPConnectionNotify(_conn where logger = _logger))
+        _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
+        _conn.unmute()
+        peer.unmute()
+        let empty: Array[U8] iso = recover iso Array[U8]() end
+        let data = _request = consume empty
+        //try data(1)? = Socks5.reply_conn_refused() end
+        peer.write(consume data)
+
+    be outgoing_socks_connection_failed(conn: TCPConnection) => 
+        None
+    
     be resolve() =>
         None
     
