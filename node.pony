@@ -57,16 +57,23 @@ actor Node
         _static_udp = consume static_udp
 
         _logger(Info) and _logger.log("Create node: " + _name + " with id " + _id.string())
+
+    be display() =>
         if (_static_tcp.size() + _static_udp.size()) > 0 then
             _logger(Info) and _logger.log("    Reachable via:")
             for ia in _static_tcp.values() do
                 _logger(Info) and _logger.log("        TCP: " + ia.string())
-                ipdb.locate(ia.u32())
+                _ipdb.locate(ia.u32())
                     .next[None](recover this~located_at() end)
             end
             for ia in _static_udp.values() do
                 _logger(Info) and _logger.log("        UDP: " + ia.string())
-                ipdb.locate(ia.u32())
+                _ipdb.locate(ia.u32())
+                    .next[None](recover this~located_at() end)
+            end
+            for ia in _socks_proxy.values() do
+                _logger(Info) and _logger.log("        SOCKS: " + ia.string())
+                _ipdb.locate(ia.u32())
                     .next[None](recover this~located_at() end)
             end
         end
@@ -82,5 +89,4 @@ actor Node
         end
 
     be add_socks_proxy(ia: InetAddrPort iso) =>
-        _logger(Info) and _logger.log("Add socks proxy to reach " + _name + " using " + ia.string())
         _socks_proxy.push(consume ia)

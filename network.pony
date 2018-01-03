@@ -19,3 +19,8 @@ actor Network
         else
             _logger(Info) and _logger.log("Cannot find node " + to_id.string() + " for " + consume addr)
         end
+
+    be display() =>
+        for node in _nodes.values() do
+            node.display()
+        end
