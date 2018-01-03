@@ -34,16 +34,32 @@ actor Chooser
         _logger   = logger
         _requests = Map[String,Promise[Resolve]]
 
+    be remove_promise(hstr: String) =>
+        try 
+            _requests.remove(hstr)?
+        end
+
     be select_connection(dialer: Dialer,addr: InetAddrPort iso) =>
-        _logger(Info) and _logger.log("Chooser: select path for destination " + addr.string())
+        _logger(Info) and _logger.log("select path for destination " + addr.string())
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
             try
-                _requests(hstr)?
+                let pold = _requests(hstr)?
+                _logger(Info) and _logger.log("Use cached value for " + addr.string())
+                pold
             else
                 let pnew = Promise[Resolve]
                 _requests(hstr) = pnew
                 pnew.timeout(5_000_000_000) // MAGIC NUMBER
+                let me = recover tag this end
+                pnew.next[Resolve]({(r:Resolve) =>
+                    // Use Map as cache for previous results. Not sure, if good or bad
+                    //me.remove_promise(hstr)
+                    r
+                },{()? =>
+                    me.remove_promise(hstr)
+                    error 
+                })
                 start_selection(pnew,consume addr)
                 pnew
             end)
@@ -63,7 +79,7 @@ actor Chooser
 
     be start_selection(p:Promise[Resolve],addr: InetAddrPort val) =>
         if addr.has_real_name then
-            _logger(Info) and _logger.log("Chooser: select path for destination " + addr.string())
+            _logger(Info) and _logger.log("select path for destination " + addr.string())
         end
 
         p(addr)
