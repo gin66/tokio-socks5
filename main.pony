@@ -55,7 +55,7 @@ actor Main
 
       let network = Network(logger)
       // Only clients need a chooser !!!
-      let chooser = Chooser(network,ipdb,myCountry,logger)
+      let chooser = Chooser(network,ipdb,myID,myCountry,logger)
 
       // Loop twice over the Nodes section. 
       // First for other nodes and then for myself

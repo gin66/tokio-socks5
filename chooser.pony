@@ -3,7 +3,7 @@ use "promises"
 use "collections"
 
 primitive DirectConnection
-type Resolve is (DirectConnection | Array[InetAddrPort val] val)
+type Resolve is (DirectConnection | (U8,Array[InetAddrPort val] val))
 
 actor Chooser
     """
@@ -30,13 +30,17 @@ actor Chooser
     let _network:   Network
     let _ipdb:      IpDB
     let _requests:  Map[String,Promise[Resolve]]
+    let _myID:      U8
     let _myCountry: String
 
-    new create(network: Network, ipdb: IpDB, myCountry: String, logger: Logger[String]) =>
+    new create(network: Network, ipdb: IpDB, 
+               myID: U8, myCountry: String,
+               logger: Logger[String]) =>
         _network   = network
         _ipdb      = ipdb
         _logger    = logger
         _requests  = Map[String,Promise[Resolve]]
+        _myID      = myID
         _myCountry = myCountry
 
     be remove_promise(hstr: String) =>
@@ -45,6 +49,14 @@ actor Chooser
         end
 
     be select_connection(dialer: Dialer,addr: InetAddrPort val) =>
+        """
+        select_connection should first decide on the node first.
+        In a second step the connection method to be determined.
+        => For this the related node can be asked for the available methods.
+
+        BTW: In case node goes down, that host to be removed from the _requests cache.
+        In order to do so, the promise to be replaced by the result or only the node info.
+        """
         _logger(Info) and _logger.log("select path for destination " + addr.string())
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
@@ -76,7 +88,7 @@ actor Chooser
             match r
             | DirectConnection =>
                 dialer.connect_direct()
-            | let proxies: Array[InetAddrPort val] val =>
+            | (let id: U8,let proxies: Array[InetAddrPort val] val) =>
                 dialer.connect_socks5_to(proxies)
             end
             r
@@ -102,7 +114,8 @@ actor Chooser
                 _logger(Info) and _logger.log(hostname + " => PROXY, no alternative in start_selection")
                 let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
                 let proxies    = recover iso [proxy_addr] end
-                p(consume proxies)
+                let id = _myID // TODO !!!
+                p((id,consume proxies))
             end
         else
             let ip = addr.u32()
@@ -126,5 +139,6 @@ actor Chooser
             _logger(Info) and _logger.log(ip.string() + " => PROXY, no alternative in selected_on_ip")
             let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
             let proxies    = recover iso [proxy_addr] end
-            p(consume proxies)
+            let id = _myID // TODO !!!
+            p((id,consume proxies))
         end
