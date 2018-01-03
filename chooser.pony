@@ -104,7 +104,6 @@ actor Chooser
             let parts = hostname.split(".")
             let country  = _myCountry.lower()
 
-            _logger(Info) and _logger.log(country + " " + addr.string())
             try
                 if country == parts(parts.size()-1)? then
                     _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")

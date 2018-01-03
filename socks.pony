@@ -1,6 +1,7 @@
 use "net"
-use "collections"
+use "time"
 use "logger"
+use "collections"
 
 primitive Socks5WaitInit
 primitive Socks5WaitRequest
@@ -164,6 +165,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
     var _state:    Socks5ClientState
+    var _start:    U64
     let _logger:   Logger[String]
 
     new iso create(dialer: Dialer,
@@ -172,6 +174,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
         _dialer = dialer
         _peer   = peer
         _state  = Socks5WaitConnect
+        _start  = Time.millis()
         _logger = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
@@ -206,6 +209,8 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 _logger(Info) and _logger.log("Reply from socks proxy received")
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
+                let delta_ms = Time.millis() - _start
+                _logger(Info) and _logger.log("Connected used ms: " + delta_ms.string())
                 _state = Socks5PassThrough
                 _peer.write(consume data)
                 return false
