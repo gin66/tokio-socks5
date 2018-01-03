@@ -7,12 +7,14 @@ class InetAddrPort is Stringable
     new iso create_from_string(host': String,port':U16) =>
         host = host'
         port = port'
+        has_real_name = true
         check_ip()
 
     new iso create_from_host_port(host_port: String) ? =>
         let hp = host_port.split(":")
         host = hp(0)?
         port = hp(1)?.u16()?
+        has_real_name = true
         check_ip()
 
     new iso create(ip': (U8,U8,U8,U8),port':U16) =>
@@ -30,7 +32,7 @@ class InetAddrPort is Stringable
                 let ip3 = parts(2)?.u8()?
                 let ip4 = parts(3)?.u8()?
                 ip  = (ip1,ip2,ip3,ip4)
-                has_real_name = true
+                has_real_name = false
             end
         end
 
