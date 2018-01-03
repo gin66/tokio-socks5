@@ -102,13 +102,18 @@ actor Dialer
             peer.unmute()
             let empty: Array[U8] iso = recover iso Array[U8]() end
             let data = _request = consume empty
-            //try data(1)? = Socks5.reply_conn_refused() end
             peer.write(consume data)
         end
 
     be outgoing_socks_connection_failed(conn: TCPConnection) => 
         _count = _count - 1
         if (_count == 0) and not _connected then
+            let empty: Array[U8] iso = recover iso Array[U8]() end
+            let data = _request = consume empty
+            try 
+                data(1)? = Socks5.reply_conn_refused()
+                _conn.write(consume data)
+            end
             _conn.dispose()
         end
     
