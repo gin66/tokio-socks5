@@ -5,8 +5,12 @@ use "logger"
 primitive Socks5WaitInit
 primitive Socks5WaitRequest
 primitive Socks5WaitConnect
+primitive Socks5WaitMethodSelection
+primitive Socks5WaitReply
+primitive Socks5PassThrough
 
 type Socks5ServerState is (Socks5WaitInit | Socks5WaitRequest | Socks5WaitConnect)
+type Socks5ClientState is (Socks5WaitConnect | Socks5WaitMethodSelection | Socks5WaitReply | Socks5PassThrough)
 
 primitive Socks5
     fun version():U8 => 5
@@ -155,19 +159,28 @@ class SocksTCPListenNotify is TCPListenNotify
 
 
 class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
-    var _dialer:    Dialer tag
-    let _logger:    Logger[String]
+    var _dialer:   Dialer tag
+    let _peer:     PeerConnection
+    var _tx_bytes: USize = 0
+    var _rx_bytes: USize = 0
+    var _state:    Socks5ClientState
+    let _logger:   Logger[String]
 
     new iso create(dialer: Dialer,
+                   peer: PeerConnection, 
                    logger: Logger[String]) =>
         _dialer = dialer
+        _peer   = peer
+        _state  = Socks5WaitConnect
         _logger = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection failed")
+        _logger(Info) and _logger.log("Connection to socks proxy failed")
         _dialer.outgoing_socks_connection_failed(conn)
 
     fun ref connected(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection to socks proxy succeeded")
+        _state  = Socks5WaitMethodSelection
         conn.write([Socks5.version();1;Socks5.meth_no_auth()])
 
     fun ref received(
@@ -175,18 +188,51 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
             data: Array[U8] iso,
             times: USize)
             : Bool =>
-        if times == 1 then
+        _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
+        _rx_bytes = _rx_bytes + data.size()
+        match _state
+        | Socks5WaitMethodSelection =>
             try
                 if data.size() != 2 then error end
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.meth_no_auth() then error end
+                _logger(Info) and _logger.log("Reply from socks proxy OK")
+                _state = Socks5WaitReply
                 _dialer.outgoing_socks_connection_succeeded(conn)
                 return false
             end
+        | Socks5WaitReply =>
+            try
+                _logger(Info) and _logger.log("Reply from socks proxy received")
+                if data(0)? != Socks5.version() then error end
+                if data(1)? != Socks5.reply_ok() then error end
+                _state = Socks5PassThrough
+                _peer.write(consume data)
+                return false
+            end
+        | Socks5PassThrough =>
+            _peer.write(consume data)
+            return false
         end
         _dialer.outgoing_socks_connection_failed(conn)
         conn.dispose()
         false
 
+    fun ref sent(
+            conn: TCPConnection ref,
+            data: (String val | Array[U8] val))
+            : (String val | Array[U8 val] val) =>
+        _tx_bytes = _tx_bytes + data.size()
+        data
+
+    fun ref throttled(conn: TCPConnection ref) =>
+        _peer.mute()
+
+    fun ref unthrottled(conn: TCPConnection ref) =>
+        _peer.unmute()
+
     fun ref closed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        _peer.dispose()
+
         _dialer.outgoing_socks_connection_failed(conn)

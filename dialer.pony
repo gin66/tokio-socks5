@@ -1,5 +1,6 @@
 use "net"
 use "logger"
+use "collections"
 
 actor Dialer
     """
@@ -42,8 +43,8 @@ actor Dialer
     let _conn:      TCPConnection tag
     let _conns:     Array[TCPConnection tag] = Array[TCPConnection tag]
     var _request:   Array[U8] iso
-    var _connected: Bool = false
-    var _count:     U8 = 0
+    var _prox_i:    USize = 0
+    var _proxies:   Array[InetAddrPort val] val = recover Array[InetAddrPort val] end
 
     new create(auth: AmbientAuth val,
                chooser: Chooser,
@@ -82,40 +83,16 @@ actor Dialer
         _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
         _conn.unmute()
 
-    be connect_socks5_to(proxies: Array[InetAddrPort val] val) =>
-        for addr in proxies.values() do
-            let conn_peer = TCPConnection(_auth,
-                            Socks5OutgoingTCPConnectionNotify(this,_logger),
+    fun ref try_next_proxy() =>
+        try
+            let addr = _proxies(_prox_i)?
+            TCPConnection(_auth,
+                            Socks5OutgoingTCPConnectionNotify(this,_conn,_logger),
                             addr.host_str(),
                             addr.port_str()
                             where init_size=16384,max_size = 16384)
-            _count = _count + 1
-        end
-
-    be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
-        """
-        Connection to a socks proxy has succeeded. Send him the original socks_request.
-        All else is just protocol
-        """
-        _count = _count - 1
-        if _connected then
-            peer.dispose()
+            _prox_i = _prox_i + 1
         else
-            _connected = true
-            _conn.mute()
-            peer.mute()
-            peer .set_notify(DirectForwardTCPConnectionNotify(_conn where logger = _logger))
-            _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
-            _conn.unmute()
-            peer.unmute()
-            let empty: Array[U8] iso = recover iso Array[U8]() end
-            let data = _request = consume empty
-            peer.write(consume data)
-        end
-
-    be outgoing_socks_connection_failed(conn: TCPConnection) => 
-        _count = _count - 1
-        if (_count == 0) and not _connected then
             let empty: Array[U8] iso = recover iso Array[U8]() end
             let data = _request = consume empty
             try 
@@ -124,3 +101,23 @@ actor Dialer
             end
             _conn.dispose()
         end
+
+    be connect_socks5_to(proxies: Array[InetAddrPort val] val) =>
+        _proxies = proxies
+        try_next_proxy()
+
+    be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
+        """
+        Connection to a socks proxy has succeeded. Send him the original socks_request.
+        All else is just protocol
+        """
+        _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
+        let x = recover Array[U8](_request.size()) end
+        for i in Range(0,_request.size()) do
+            x.push(try _request(i)? else 0 end)
+        end
+        peer.write(consume x)
+        _logger(Info) and _logger.log("Sent request to socks proxy")
+
+    be outgoing_socks_connection_failed(conn: TCPConnection) => 
+        try_next_proxy()
