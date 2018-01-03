@@ -2,6 +2,7 @@ class InetAddrPort is Stringable
     let host: String
     var ip: (U8,U8,U8,U8) = (0,0,0,0)
     let port: U16
+    var has_real_name: Bool = false
 
     new iso create_from_string(host': String,port':U16) =>
         host = host'
@@ -29,6 +30,7 @@ class InetAddrPort is Stringable
                 let ip3 = parts(2)?.u8()?
                 let ip4 = parts(3)?.u8()?
                 ip  = (ip1,ip2,ip3,ip4)
+                has_real_name = true
             end
         end
 
@@ -45,7 +47,7 @@ class InetAddrPort is Stringable
     fun box port_str() : String iso^ =>
         port.string()
 
-    fun box is_ipv4() : Bool =>
+    fun box has_ipv4() : Bool =>
         (let ip1,let ip2,let ip3,let ip4) = ip
         (ip1 + ip2 + ip3 + ip4) == 0
 

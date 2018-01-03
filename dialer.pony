@@ -56,6 +56,15 @@ actor Dialer
         _conn    = conn
         _request = consume socks_request
         _chooser.select_connection(this, consume addr)
+    
+    be select_timeout() =>
+        let empty: Array[U8] iso = recover iso Array[U8]() end
+        let data = _request = consume empty
+        try 
+            data(1)? = Socks5.reply_host_unreachable()
+            _conn.write(consume data)
+        end
+        _conn.dispose()
 
     be connect_direct(addr: InetAddrPort val) =>
         _conn.mute()
