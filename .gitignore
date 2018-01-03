@@ -2,3 +2,4 @@ target
 Cargo.lock
 uservpn-socks5
 config.ini
+dbip-country-*.csv
