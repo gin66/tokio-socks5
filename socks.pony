@@ -100,7 +100,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             end
             // The dialer should call set_notify on actor conn.
             // This means, no more communication should happen with this notifier
-            Dialer(_auth,_logger).connect_to(conn,consume addr,consume data)
+            Dialer(_auth,conn,consume addr,consume data,_logger)
             _state = Socks5WaitConnect
         | Socks5WaitConnect=>
             _logger(Info) and _logger.log("Received data, while waiting for connection")

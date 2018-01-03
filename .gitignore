@@ -1,3 +1,4 @@
 target
 Cargo.lock
 uservpn-socks5
+config.ini
