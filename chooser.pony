@@ -87,12 +87,23 @@ actor Chooser
         _logger(Info) and _logger.log("select path for destination " + addr.string())
         if addr.has_real_name then
             let hostname = addr.host_str()
-            None
+            let parts = hostname.split(".")
+            let country  = _myCountry.lower()
+
+            _logger(Info) and _logger.log(country + " " + addr.string())
+            try
+                if country == parts(parts.size()-1)? then
+                    _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")
+                    p(DirectConnection)
+                    return
+                else   
+                    _logger(Info) and _logger.log(hostname + " => " + parts(parts.size()-1)?)
+                end
+            end
         else
             let ip = addr.u32()
         end
 
-        //p(DirectConnection)
 
         try
             let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
