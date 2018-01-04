@@ -106,7 +106,7 @@ actor Dialer
         _proxies = proxies
         try_next_proxy()
 
-    be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
+    be outgoing_socks_connection_succeeded(peer: TCPConnection,conn_time_ms: U64) => 
         """
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
@@ -119,9 +119,9 @@ actor Dialer
         peer.write(consume x)
         _logger(Info) and _logger.log("Sent request to socks proxy")
 
-    be outgoing_socks_connection_established(used_time_ms: U64) => 
-        _logger(Info) and _logger.log("Connected used ms: " + used_time_ms.string())
-    
+    be outgoing_socks_connection_established(conn_time_ms: U64,used_time_ms: U64) => 
+        _logger(Info) and _logger.log("Timing till connect/complete: "
+                                     + conn_time_ms.string() +"/" + used_time_ms.string() + " ms")
 
     be outgoing_socks_connection_failed(conn: TCPConnection) => 
         try_next_proxy()

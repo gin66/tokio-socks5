@@ -165,17 +165,19 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
     var _state:    Socks5ClientState
-    var _start:    U64
+    let _start_ms: U64
+    var _first_ms: U64
     let _logger:   Logger[String]
 
     new iso create(dialer: Dialer,
                    peer: PeerConnection, 
                    logger: Logger[String]) =>
-        _dialer = dialer
-        _peer   = peer
-        _state  = Socks5WaitConnect
-        _start  = Time.millis()
-        _logger = logger
+        _dialer   = dialer
+        _peer     = peer
+        _state    = Socks5WaitConnect
+        _start_ms = Time.millis()
+        _first_ms = 0
+        _logger   = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection to socks proxy failed")
@@ -200,8 +202,9 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.meth_no_auth() then error end
                 _logger(Info) and _logger.log("Reply from socks proxy OK")
+                _first_ms = Time.millis() - _start_ms
                 _state = Socks5WaitReply
-                _dialer.outgoing_socks_connection_succeeded(conn)
+                _dialer.outgoing_socks_connection_succeeded(conn,_first_ms)
                 return false
             end
         | Socks5WaitReply =>
@@ -209,8 +212,8 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 _logger(Info) and _logger.log("Reply from socks proxy received")
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
-                let delta_ms = Time.millis() - _start
-                _dialer.outgoing_socks_connection_established(delta_ms)
+                let delta_ms = Time.millis() - _start_ms
+                _dialer.outgoing_socks_connection_established(_first_ms,delta_ms)
                 _state = Socks5PassThrough
                 _peer.write(consume data)
                 return false
