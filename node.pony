@@ -83,15 +83,14 @@ actor Node
             end
             for ia in _socks_proxy.values() do
                 _logger(Info) and _logger.log("        SOCKS: " + ia.string())
-                _ipdb.locate(ia.u32())
-                    .next[None](recover this~located_at() end)
             end
         end
 
     be located_at(country: String) =>
         if _country != country then
             if _country != "ZZ" then
-                _logger(Error) and _logger.log("??? OLD LOCATION " + _country.string())
+                _logger(Error) and _logger.log(_name + ": OLD LOCATION is " + _country.string()
+                      + ", new location is " + country.string() )
             else
                 _logger(Info) and _logger.log(_name + " is located in " + country.string())
             end
