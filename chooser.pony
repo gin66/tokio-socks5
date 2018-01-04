@@ -32,6 +32,18 @@ actor Chooser
     let _requests:  Map[String,Promise[Resolve]]
     let _myID:      U8
     let _myCountry: String
+    let _countries: String = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ "
+                            +"BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ "
+                            +"CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ "
+                            +"DE DJ DK DM DO DZ EC EE EG ER ES ET FI FJ FK FM FO FR "
+                            +"GA GB GD GE GF GG GH GI GL GM GN GP GQ GR GS GT GU GW GY "
+                            +"HK HN HR HT HU ID IE IL IM IN IO IQ IR IS IT JE JM JO JP "
+                            +"KE KG KH KI KM KN KP KR KW KY KZ LA LB LC LI LK LR LS LT LU LV LY "
+                            +"MA MC MD ME MF MG MH MK ML MM MN MO MP MQ MR MS MT MU MV MW MX MY MZ "
+                            +"NA NC NE NF NG NI NL NO NP NR NU NZ OM PA PE PF PG PH PK PL PM PN PR PS PT PW PY "
+                            +"QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ "
+                            +"TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ "
+                            +"VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW ZZ "
 
     new create(network: Network, ipdb: IpDB, 
                myID: U8, myCountry: String,
@@ -68,7 +80,7 @@ actor Chooser
                 let pnew = Promise[Resolve]
                 _requests(hstr) = pnew
                 _logger(Info) and _logger.log("Have " + 
-                    _requests.size().string() + " cached values")
+                    _requests.size().string() + " values in cache")
                 pnew.timeout(5_000_000_000) // MAGIC NUMBER
                 let me = recover tag this end
                 pnew.next[Resolve]({(r:Resolve) =>
@@ -102,15 +114,18 @@ actor Chooser
         if addr.has_real_name then
             let hostname = addr.host_str()
             let parts = hostname.split(".")
-            let country  = _myCountry.lower()
 
+            let last: String val = (try parts(parts.size()-1)? else "" end).upper()
+            if (last.size() == 2) and _countries.contains(last + " ") then
+                _network.select_node_by_country(last,"CN")
+            end
+            if _myCountry == last then
+                _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")
+                p(DirectConnection)
+                return
+            end
+            _logger(Info) and _logger.log(hostname + " => PROXY, no alternative in start_selection")
             try
-                if country == parts(parts.size()-1)? then
-                    _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")
-                    p(DirectConnection)
-                    return
-                end
-                _logger(Info) and _logger.log(hostname + " => PROXY, no alternative in start_selection")
                 let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
                 let proxies    = recover iso [proxy_addr] end
                 let id = _myID // TODO !!!

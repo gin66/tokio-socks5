@@ -64,7 +64,8 @@ actor Main
           let id_num = id.u8()?
           if (id_num == myID) == self then
             if sections.contains(name) then
-              let node = NodeBuilder(ipdb,id_num, self, name,logger)
+              var country = "ZZ"
+              let node = NodeBuilder(network,ipdb,id_num, self, name,logger)
               for (key,value) in sections(name)?.pairs() do
                 let composite = key.split_by("->")
                 let first = try composite(0)? else "" end
@@ -85,6 +86,9 @@ actor Main
                       recover SocksTCPListenNotify(auth, chooser,logger) end, 
                       ia.host_str(), ia.port_str() 
                       where init_size=16384,max_size = 16384)
+                | "Country" =>
+                    country = value
+                    node.set_country(country)
                 | "SocksProxy" =>
                     if self then
                       let to_id = composite(1)?.u8()?
@@ -95,7 +99,7 @@ actor Main
                     end
                 end
               end
-              network.add_node(id_num,node.build())
+              network.add_node(id_num,node.build(),if self then myCountry else country end)
             else
               env.out.print("    No section for this node")
               error
