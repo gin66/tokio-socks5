@@ -4,6 +4,7 @@ use "logger"
 actor Network
     let _logger : Logger[String]
     let _nodes : HashMap[U8,(String,Node tag),HashIs[U8]] = HashMap[U8,(String,Node tag),HashIs[U8]]
+    var _scnt: USize = 0
 
     new create(logger: Logger[String]) =>
         _logger = logger
@@ -41,11 +42,15 @@ actor Network
             (let country,let node) = country_node
             if not forbidden_countries.contains(country) then
                 candidates.push(id)
-            end
-            if country == destination_country then
-                ids.push(id)
+                if country == destination_country then
+                    ids.push(id)
+                end
             end
             _logger(Info) and _logger.log(country + "=> " + ids.size().string() + "/" + candidates.size().string())
         end
         let select = (if ids.size() == 0 then candidates else ids end)
-        _logger(Info) and _logger.log("Number of nodes: " + select.size().string())
+        _scnt = _scnt+1
+        let i = _scnt % select.size()
+        let node_id = (try select(i)? else 0 end)
+        _logger(Info) and _logger.log("Number of nodes: " + select.size().string()
+                                    + " select node_id=" + node_id.string())
