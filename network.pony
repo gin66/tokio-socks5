@@ -5,13 +5,7 @@ use "collections"
 
 type Resolve is (DirectConnection | Array[Node tag] val)
 
-class NodeInfoMap
-    let node:       Node tag
-    var country:    String
-
-    new trn create(country': String,node': Node tag) =>
-        country = country'
-        node    = node'
+type NodeInfoMap is (String,Node tag)
 
 actor Network
     let _auth:    AmbientAuth val
@@ -24,26 +18,26 @@ actor Network
         _logger = logger
 
     be add_node(node_id: U8, node: Node tag,country: String) =>
-        _nodes.update(node_id,recover iso NodeInfoMap(country,node) end)
+        _nodes.update(node_id,(country,node))
 
     be add_socks_proxy(to_id: U8,ia: InetAddrPort iso) =>
         let addr = ia.string()
         try
-            let ni = _nodes(to_id)?
-            ni.node.add_socks_proxy(consume ia)
+            (let country,let node) = _nodes(to_id)?
+            node.add_socks_proxy(consume ia)
         else
             _logger(Info) and _logger.log("Cannot find node " + to_id.string() + " for " + consume addr)
         end
 
     be display() =>
-        for ni in _nodes.values() do
-            ni.node.display()
+        for (country,node) in _nodes.values() do
+            node.display()
         end
 
     be country_of_node(id: U8, country: String) =>
         try
-            let ni = _nodes(id)?
-            ni.country = country
+            (let old_country,let node) = _nodes(id)?
+            _nodes(id) = (country,node)
         end
 
     be select_node_by_countries(p:Promise[Resolve],
@@ -70,13 +64,14 @@ actor Network
                     return
                 end
             else
-                if not forbidden_countries.contains(ni.country) then
-                    candidates.push(ni.node)
-                    if destination_countries.contains(ni.country) then
-                        nodes.push(ni.node)
+                (let country,let node) = ni
+                if not forbidden_countries.contains(country) then
+                    candidates.push(node)
+                    if destination_countries.contains(country) then
+                        nodes.push(node)
                     end
                 end
-                _logger(Info) and _logger.log(ni.country 
+                _logger(Info) and _logger.log(country 
                             + "=> " + nodes.size().string() + "/" + candidates.size().string())
             end
         end
