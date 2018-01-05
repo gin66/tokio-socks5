@@ -1,6 +1,7 @@
 use "net"
-use "collections"
+use "time"
 use "logger"
+use "collections"
 
 interface tag PeerConnection
     be write(data: (String val | Array[U8 val] val))
@@ -10,14 +11,23 @@ interface tag PeerConnection
 
 class DirectForwardTCPConnectionNotify is TCPConnectionNotify
     let _logger:    Logger[String]
+    let _dialer:    Dialer
     let _peer:      PeerConnection
+    let _report:    Bool
     var _conn_data: Array[U8] iso       // only used in connected and connect_failed
-    var _tx_bytes: USize = 0
-    var _rx_bytes: USize = 0
+    var _tx_bytes:  USize = 0
+    var _rx_bytes:  USize = 0
+    var _last_sent_ms: U64       = 0
+    var _first_received_ms: U64  = 0
 
-    new iso create(peer: PeerConnection, conn_data: Array[U8] iso = recover iso Array[U8]() end,
+    new iso create(dialer: Dialer,
+                   peer: PeerConnection,
+                   report: Bool,
+                   conn_data: Array[U8] iso = recover iso Array[U8]() end,
                    logger: Logger[String]) =>
+        _dialer    = dialer
         _peer      = peer
+        _report    = report
         _conn_data = consume conn_data
         _logger    = logger
 
@@ -51,6 +61,12 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             : Bool =>
         _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
         _rx_bytes = _rx_bytes + data.size()
+        if _first_received_ms == 0 then
+            _first_received_ms = Time.millis()
+            if _report then
+                _dialer.roundtrip_ms(_first_received_ms - _last_sent_ms)
+            end
+        end
         _peer.write(consume data)
         false
 
@@ -59,6 +75,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             data: (String val | Array[U8] val))
             : (String val | Array[U8 val] val) =>
         _tx_bytes = _tx_bytes + data.size()
+        _last_sent_ms = Time.millis()
         data
 
     fun ref throttled(conn: TCPConnection ref) =>

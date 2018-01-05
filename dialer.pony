@@ -59,7 +59,10 @@ actor Dialer
         _addr    = consume addr
         _request = consume socks_request
         _chooser.select_connection(this, _addr)
-    
+
+    be roundtrip_ms(data_round_trip_ms: U64) =>
+        _logger(Info) and _logger.log("Data roundtrip in ms:" + data_round_trip_ms.string())
+
     be select_timeout() =>
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let data = _request = consume empty
@@ -74,13 +77,16 @@ actor Dialer
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let req = _request = consume empty
         let conn_peer = TCPConnection(_auth,
-                            DirectForwardTCPConnectionNotify(_conn,
+                            DirectForwardTCPConnectionNotify(this,
+                                                             _conn,
+                                                            false,
                                                              consume req,
                                                              _logger),
                                 _addr.host_str(),
                                 _addr.port_str()
                                 where init_size=16384,max_size = 16384)
-        _conn.set_notify(DirectForwardTCPConnectionNotify(conn_peer where logger = _logger))
+        _conn.set_notify(DirectForwardTCPConnectionNotify(
+                            this,conn_peer,true where logger = _logger))
         _conn.unmute()
 
     fun ref try_next_proxy() =>
@@ -111,7 +117,8 @@ actor Dialer
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
         """
-        _conn.set_notify(DirectForwardTCPConnectionNotify(peer  where logger = _logger))
+        _conn.set_notify(DirectForwardTCPConnectionNotify(
+                                this,peer,true  where logger = _logger))
         let x = recover Array[U8](_request.size()) end
         for i in Range(0,_request.size()) do
             x.push(try _request(i)? else 0 end)
