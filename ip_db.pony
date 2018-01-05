@@ -12,7 +12,7 @@ actor IpDB
     var db_from : Array[U32] = Array[U32](460589)
     var db_to   : Array[U32] = Array[U32](460589)
     var cn      : Array[U16] = Array[U16](460589)
-    let _pending: Array[(U32,Promise[String])] = Array[(U32,Promise[String])]
+    let _pending: Array[(Array[U32] val,Promise[String])] = Array[(Array[U32] val,Promise[String])]
     let _logger : Logger[String]
     var _is_loaded : Bool = false
 
@@ -74,18 +74,27 @@ actor IpDB
             end
         end
 
-    fun tag locate(addr: U32): Promise[String] =>
+    fun tag locate(ips: Array[U32] val): Promise[String] =>
         let promise = Promise[String]
-        _do_locate(addr,promise)
+        _do_locate(ips,promise)
         promise
 
-    be _do_locate(addr: U32, promise: Promise[String]) =>
+    be _do_locate(ips: Array[U32] val, promise: Promise[String]) =>
         if _is_loaded then
-            let country = _u16_to_country(_locate(addr))
-            _logger(Fine) and _logger.log("Country for " + addr.string() + " is " + country)
-            promise(country)
+            let countries = recover iso String(3*ips.size()) end
+            for ip in ips.values() do
+               let country = _u16_to_country(_locate(ip))
+                _logger(Info) and _logger.log("Country for " + ip.string() + " is " + country)
+                if not countries.contains(country) then
+                    if countries.size() > 0 then
+                        countries.append(",")
+                    end
+                    countries.append(country)
+                end
+            end
+            promise(consume countries)
         else
-            _pending.push( (addr,promise) )
+            _pending.push( (ips,promise) )
         end
 
     fun tag _u16_to_country(code: U16): String val =>

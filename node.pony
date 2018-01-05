@@ -73,12 +73,12 @@ actor Node
             _logger(Info) and _logger.log("    Reachable via:")
             for ia in _static_tcp.values() do
                 _logger(Info) and _logger.log("        TCP: " + ia.string())
-                _ipdb.locate(ia.u32())
+                _ipdb.locate([ia.u32()])
                     .next[None](recover this~located_at() end)
             end
             for ia in _static_udp.values() do
                 _logger(Info) and _logger.log("        UDP: " + ia.string())
-                _ipdb.locate(ia.u32())
+                _ipdb.locate([ia.u32()])
                     .next[None](recover this~located_at() end)
             end
             for ia in _socks_proxy.values() do
