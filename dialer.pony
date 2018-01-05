@@ -138,6 +138,7 @@ actor Dialer
                                      + "/" + auth_ms.string()
                                      + "/" + established_ms.string()
                                      + " ms")
+        _route_id = route_id
         try 
             let node = _nodes(_node_i)?
             node.record_established_connection(_route_id,conn_ms,auth_ms,established_ms)
