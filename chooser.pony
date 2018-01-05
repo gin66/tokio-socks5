@@ -132,7 +132,7 @@ actor Chooser
             let forbidden = forbidden_by_hostname(hostname.string(),domain)
             _logger(Info) and _logger.log(hostname + " => forbidden countries: " + forbidden)
             if (last.size() == 2) and _countries.contains(last + " ") then
-                select_on_countries(p,forbidden,last)
+                _network.select_node_by_countries(p,_myID,_myCountry,last,forbidden)
             else
                 // Need to resolve hostname to ip(s)
                 let pdns = _network.dns_resolve(addr)
@@ -147,22 +147,18 @@ actor Chooser
 
     be _convert_ips_to_country(p:Promise[Resolve],forbidden:String,ips: Array[U32] val) =>
         let prom = _ipdb.locate(ips)
-        let me = recover this~select_on_countries(p,forbidden) end
         for ip in ips.values() do
             _logger(Info) and _logger.log("Find out country for " + ip.string())
         end
-        prom.next[None]({(dest_countries: String)(c=consume me) =>
-            c(dest_countries)
+        prom.next[None]({(dest_countries: String) =>
+            """
+            At this point the destination has been mapped to a comma separated list of countries.
+            Eventually some countries are forbidden as derived from hostname analysis.
+            The complex process to select the node is delegated to the network
+            """
+            //c(dest_countries)
+            _network~select_node_by_countries(p,_myID,_myCountry,forbidden,dest_countries)
         })
-
-    be select_on_countries(p:Promise[Resolve],forbidden:String,dest_countries: String) =>
-        """
-        At this point the destination has been mapped to a comma separated list of countries.
-        Eventually some countries are forbidden as derived from hostname analysis.
-        The complex process to select the node is delegated to the network
-        """
-        _logger(Info) and _logger.log("select on countries with " + dest_countries + " and forbidden:" + forbidden)
-        _network.select_node_by_countries(p,_myID,_myCountry,dest_countries,forbidden)
 
     be successful_connection(addr: InetAddrPort val,node: Node) =>
         let hstr: String val = addr.host_str()

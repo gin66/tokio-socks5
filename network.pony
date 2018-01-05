@@ -47,7 +47,9 @@ actor Network
         end
 
     be select_node_by_countries(p:Promise[Resolve],
-                myID: U8,myCountry:String,destination_countries:String,forbidden_countries:String) =>
+                myID: U8,myCountry:String,
+                forbidden_countries:String,
+                destination_countries:String) =>
         """
         Difficult to come up with the best node to use as internet connection.
         The selection should depend on node availability, distance of node to destination,
