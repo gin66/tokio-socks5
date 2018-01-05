@@ -242,5 +242,3 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()
-
-        _dialer.outgoing_socks_connection_failed(conn)
