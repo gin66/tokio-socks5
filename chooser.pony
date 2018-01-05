@@ -2,9 +2,6 @@ use "logger"
 use "promises"
 use "collections"
 
-primitive DirectConnection
-type Resolve is (DirectConnection | (U8,Array[InetAddrPort val] val))
-
 actor Chooser
     """
     The Chooser shall select the best path for the system.
@@ -101,8 +98,8 @@ actor Chooser
             match r
             | DirectConnection =>
                 dialer.connect_direct()
-            | (let id: U8,let proxies: Array[InetAddrPort val] val) =>
-                dialer.connect_socks5_to(proxies)
+            | let nodes: Array[Node tag] val =>
+                dialer.connect_socks5_to(nodes)
             end
             r
         },{()? =>
@@ -166,8 +163,9 @@ actor Chooser
         """
         _logger(Info) and _logger.log("select on countries with " + dest_countries + " and forbidden:" + forbidden)
         let pids = _network.select_node_by_countries(_myID,dest_countries,forbidden)
-        pids.next[None]({(ids:Array[U8] val) =>
-            _logger(Info) and _logger.log("list of ids:" + ids.size().string())
+        pids.next[None]({(nodes:Array[Node tag] val) =>
+            _logger(Info) and _logger.log("list of nodes:" + nodes.size().string())
+            p(nodes)
         })
 
     be xxxx_selected_on_ip(p:Promise[Resolve],ip: U32,dest_country: String) =>
@@ -183,5 +181,5 @@ actor Chooser
             let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
             let proxies    = recover iso [proxy_addr] end
             let id = _myID // TODO !!!
-            p((id,consume proxies))
+            //p((id,consume proxies))
         end

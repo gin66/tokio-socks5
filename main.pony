@@ -68,7 +68,7 @@ actor Main
           if (id_num == myID) == self then
             if sections.contains(name) then
               var country = "ZZ"
-              let node = NodeBuilder(network,ipdb,id_num, self, name,logger)
+              let node = NodeBuilder(network,auth,ipdb,id_num, self, name,logger)
               for (key,value) in sections(name)?.pairs() do
                 let composite = key.split_by("->")
                 let first = try composite(0)? else "" end

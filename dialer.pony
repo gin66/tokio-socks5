@@ -43,8 +43,8 @@ actor Dialer
     let _conn:      TCPConnection tag
     let _conns:     Array[TCPConnection tag] = Array[TCPConnection tag]
     var _request:   Array[U8] iso
-    var _prox_i:    USize = 0
-    var _proxies:   Array[InetAddrPort val] val = recover Array[InetAddrPort val] end
+    var _node_i:    USize = 0
+    var _nodes:     Array[Node tag] val = recover Array[Node tag] end
 
     new create(auth: AmbientAuth val,
                chooser: Chooser,
@@ -89,15 +89,10 @@ actor Dialer
                             this,conn_peer,true where logger = _logger))
         _conn.unmute()
 
-    fun ref try_next_proxy() =>
+    fun ref try_next_node() =>
         try
-            let addr = _proxies(_prox_i)?
-            TCPConnection(_auth,
-                            Socks5OutgoingTCPConnectionNotify(this,_conn,_logger),
-                            addr.host_str(),
-                            addr.port_str()
-                            where init_size=16384,max_size = 16384)
-            _prox_i = _prox_i + 1
+            let node = _nodes(_node_i)?
+            node.provide_connection_to_you(this,_conn)
         else
             let empty: Array[U8] iso = recover iso Array[U8]() end
             let data = _request = consume empty
@@ -108,15 +103,17 @@ actor Dialer
             _conn.dispose()
         end
 
-    be connect_socks5_to(proxies: Array[InetAddrPort val] val) =>
-        _proxies = proxies
-        try_next_proxy()
+    be connect_socks5_to(node_ids: Array[Node tag] val) =>
+        _logger(Info) and _logger.log("called connect_socks5_to")
+        _nodes = node_ids
+        try_next_node()
 
     be outgoing_socks_connection_succeeded(peer: TCPConnection,conn_time_ms: U64) => 
         """
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
         """
+        _logger(Info) and _logger.log("Outgoing socks connection succeeded")
         _conn.set_notify(DirectForwardTCPConnectionNotify(
                                 this,peer,true  where logger = _logger))
         let x = recover Array[U8](_request.size()) end
@@ -131,4 +128,5 @@ actor Dialer
                                      + conn_time_ms.string() +"/" + used_time_ms.string() + " ms")
 
     be outgoing_socks_connection_failed(conn: TCPConnection) => 
-        try_next_proxy()
+        _logger(Info) and _logger.log("Outgoing socks connection failed")
+        try_next_node()
