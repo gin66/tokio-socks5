@@ -45,6 +45,7 @@ actor Dialer
     var _request:   Array[U8] iso
     var _node_i:    USize = 0
     var _nodes:     Array[Node tag] val = recover Array[Node tag] end
+    var _route_id:  USize = USize.max_value()
 
     new create(auth: AmbientAuth val,
                chooser: Chooser,
@@ -65,6 +66,7 @@ actor Dialer
         try 
             let node = _nodes(_node_i)?
             _chooser.successful_connection(_addr,node)
+            node.record_roundtrip_ms(_route_id,data_round_trip_ms)
         end
 
     be select_timeout() =>
@@ -112,7 +114,7 @@ actor Dialer
         _nodes = nodes
         try_next_node()
 
-    be outgoing_socks_connection_succeeded(peer: TCPConnection,conn_time_ms: U64) => 
+    be outgoing_socks_connection_succeeded(peer: TCPConnection) => 
         """
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
@@ -127,10 +129,25 @@ actor Dialer
         peer.write(consume x)
         _logger(Info) and _logger.log("Sent request to socks proxy")
 
-    be outgoing_socks_connection_established(conn_time_ms: U64,used_time_ms: U64) => 
-        _logger(Info) and _logger.log("Timing till connect/complete: "
-                                     + conn_time_ms.string() +"/" + used_time_ms.string() + " ms")
+    be outgoing_socks_connection_established(route_id:USize,
+                                             conn_ms: U64,
+                                             auth_ms: U64,
+                                             established_ms: U64) => 
+        _logger(Info) and _logger.log("Timing till connect/auth/complete: "
+                                     +       conn_ms.string()
+                                     + "/" + auth_ms.string()
+                                     + "/" + established_ms.string()
+                                     + " ms")
+        try 
+            let node = _nodes(_node_i)?
+            node.record_established_connection(_route_id,conn_ms,auth_ms,established_ms)
+        end
 
-    be outgoing_socks_connection_failed(conn: TCPConnection) => 
+    be outgoing_socks_connection_failed(route_id:USize,conn: TCPConnection) => 
         _logger(Info) and _logger.log("Outgoing socks connection failed")
         try_next_node()
+        _route_id = route_id
+        try 
+            let node = _nodes(_node_i)?
+            node.record_failed_connection(_route_id)
+        end

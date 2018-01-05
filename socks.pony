@@ -165,27 +165,33 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     var _tx_bytes: USize = 0
     var _rx_bytes: USize = 0
     var _state:    Socks5ClientState
+    var _route_id: USize
     let _start_ms: U64
-    var _first_ms: U64
+    var _conn_ms:  U64
+    var _auth_ms:  U64
     let _logger:   Logger[String]
 
     new iso create(dialer: Dialer,
+                   route_id: USize,
                    peer: PeerConnection, 
                    logger: Logger[String]) =>
         _dialer   = dialer
+        _route_id = route_id
         _peer     = peer
         _state    = Socks5WaitConnect
         _start_ms = Time.millis()
-        _first_ms = 0
+        _conn_ms  = 0
+        _auth_ms  = 0
         _logger   = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection to socks proxy failed")
-        _dialer.outgoing_socks_connection_failed(conn)
+        _dialer.outgoing_socks_connection_failed(_route_id,conn)
 
     fun ref connected(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Connection to socks proxy succeeded")
         _state  = Socks5WaitMethodSelection
+        _conn_ms = Time.millis() - _start_ms
         conn.write([Socks5.version();1;Socks5.meth_no_auth()])
 
     fun ref received(
@@ -202,9 +208,9 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.meth_no_auth() then error end
                 _logger(Info) and _logger.log("Reply from socks proxy OK")
-                _first_ms = Time.millis() - _start_ms
+                _auth_ms = Time.millis() - _start_ms
                 _state = Socks5WaitReply
-                _dialer.outgoing_socks_connection_succeeded(conn,_first_ms)
+                _dialer.outgoing_socks_connection_succeeded(conn)
                 return false
             end
         | Socks5WaitReply =>
@@ -213,7 +219,8 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
                 let delta_ms = Time.millis() - _start_ms
-                _dialer.outgoing_socks_connection_established(_first_ms,delta_ms)
+                _dialer.outgoing_socks_connection_established(_route_id,_conn_ms,
+                                                                        _auth_ms,delta_ms)
                 _state = Socks5PassThrough
                 _peer.write(consume data)
                 return false
@@ -222,7 +229,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
             _peer.write(consume data)
             return false
         end
-        _dialer.outgoing_socks_connection_failed(conn)
+        _dialer.outgoing_socks_connection_failed(_route_id,conn)
         conn.dispose()
         false
 

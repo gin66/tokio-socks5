@@ -10,11 +10,15 @@ type Connection is (  DirectConnection | TCPUDPchannel | SocksConnection)
 class RouteInfo
     let connection: Connection
     let socks:             (None|InetAddrPort val)
-    var sum_round_trip_ms: U64  = 0
     var nr_connections:    U32  = 0
+    var sum_connection_ms: U64  = 0
+    var sum_auth_ms:       U64  = 0
+    var sum_establish_ms:  U64  = 0
+    var nr_roundtrips:    U32  = 0
+    var sum_roundtrip_ms: U64  = 0
     var down:              Bool = false
     var down_count:        U32  = 0
-    
+
     new trn create(connection': Connection, socks': (None|InetAddrPort iso) = None) =>
         connection = connection'
         if socks' is None then
@@ -75,7 +79,7 @@ actor Node
     let _static_tcp : Array[InetAddrPort ref]
     var _country: String = "ZZ"
     // This node is reachable via client accessible socks proxy
-    let _routes: Array[RouteInfo trn] = Array[RouteInfo trn]
+    let _routes: Array[RouteInfo ref] = Array[RouteInfo ref]
     var connection_count: USize = 0
 
     new create(network: Network,
@@ -143,18 +147,43 @@ actor Node
     be provide_connection_to_you(dialer: Dialer,conn: TCPConnection) =>
         _logger(Info) and _logger.log("Provide connection to "+_name)
         connection_count = connection_count + 1
-        let i = connection_count % _routes.size()
+        let route_id = connection_count % _routes.size()
         try
-            let route = _routes(i)?
+            let route = _routes(route_id)?
             match route.connection
             | SocksConnection =>
                 match route.socks
                 |   let ia:InetAddrPort val =>
                     TCPConnection(_auth,
-                        Socks5OutgoingTCPConnectionNotify(dialer,conn,_logger),
+                        Socks5OutgoingTCPConnectionNotify(dialer,route_id,conn,_logger),
                         ia.host_str(),
                         ia.port_str()
                         where init_size=16384,max_size = 16384)
                 end
             end
         end
+
+    be record_failed_connection(route_id:USize) =>
+        try
+            let ri = _routes(route_id)?
+            ri.down = true
+            ri.down_count = ri.down_count+1
+        end
+
+    be record_established_connection(route_id:USize,
+                                     conn_ms:U64,auth_ms:U64,established_ms:U64) =>
+        try
+            let ri = _routes(route_id)?
+            ri.nr_connections = ri.nr_connections+1
+            ri.sum_connection_ms = ri.sum_connection_ms + conn_ms
+            ri.sum_auth_ms = ri.sum_auth_ms + auth_ms
+            ri.sum_establish_ms = ri.sum_establish_ms + established_ms
+        end
+
+    be record_roundtrip_ms(route_id:USize,data_roundtrip_ms: U64) =>
+        try
+            let ri = _routes(route_id)?
+            ri.nr_roundtrips = ri.nr_roundtrips
+            ri.sum_roundtrip_ms = ri.sum_roundtrip_ms + data_roundtrip_ms
+        end
+
