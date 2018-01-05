@@ -71,8 +71,8 @@ actor Chooser
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
             try
-                _logger(Info) and _logger.log("Use cached value for " + addr.string())
                 let pold = _requests(hstr)?
+                _logger(Info) and _logger.log("Use cached value for " + addr.string()) // must be here
                 pold
             else
                 let pnew = Promise[Resolve]
@@ -156,7 +156,8 @@ actor Chooser
             Eventually some countries are forbidden as derived from hostname analysis.
             The complex process to select the node is delegated to the network
             """
-            _network~select_node_by_countries(p,_myID,_myCountry,forbidden,dest_countries)
+            _logger(Info) and _logger.log("Destination countries: " + dest_countries)
+            _network.select_node_by_countries(p,_myID,_myCountry,forbidden,dest_countries)
         })
 
     be successful_connection(addr: InetAddrPort val,node: Node) =>
