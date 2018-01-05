@@ -156,7 +156,6 @@ actor Chooser
             Eventually some countries are forbidden as derived from hostname analysis.
             The complex process to select the node is delegated to the network
             """
-            //c(dest_countries)
             _network~select_node_by_countries(p,_myID,_myCountry,forbidden,dest_countries)
         })
 
