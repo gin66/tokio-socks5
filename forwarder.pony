@@ -61,12 +61,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             : Bool =>
         _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
         _rx_bytes = _rx_bytes + data.size()
-        if _first_received_ms == 0 then
-            _first_received_ms = Time.millis()
-            if _report then
-                _dialer.roundtrip_ms(_first_received_ms - _last_sent_ms)
-            end
-        end
+        _last_sent_ms = Time.millis() // "last_sent" to the internet host, thus receive here
         _peer.write(consume data)
         false
 
@@ -75,7 +70,12 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             data: (String val | Array[U8] val))
             : (String val | Array[U8 val] val) =>
         _tx_bytes = _tx_bytes + data.size()
-        _last_sent_ms = Time.millis()
+        if (_first_received_ms == 0) and (_last_sent_ms != 0) then
+            _first_received_ms = Time.millis()
+            if _report then
+                _dialer.roundtrip_ms(_first_received_ms - _last_sent_ms)
+            end
+        end
         data
 
     fun ref throttled(conn: TCPConnection ref) =>
