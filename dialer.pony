@@ -62,6 +62,10 @@ actor Dialer
 
     be roundtrip_ms(data_round_trip_ms: U64) =>
         _logger(Info) and _logger.log("Data roundtrip in ms:" + data_round_trip_ms.string())
+        try 
+            let node = _nodes(_node_i)?
+            _chooser.successful_connection(_addr,node)
+        end
 
     be select_timeout() =>
         let empty: Array[U8] iso = recover iso Array[U8]() end
@@ -103,9 +107,9 @@ actor Dialer
             _conn.dispose()
         end
 
-    be connect_socks5_to(node_ids: Array[Node tag] val) =>
+    be connect_socks5_to(nodes: Array[Node tag] val) =>
         _logger(Info) and _logger.log("called connect_socks5_to")
-        _nodes = node_ids
+        _nodes = nodes
         try_next_node()
 
     be outgoing_socks_connection_succeeded(peer: TCPConnection,conn_time_ms: U64) => 

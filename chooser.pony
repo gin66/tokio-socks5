@@ -71,8 +71,8 @@ actor Chooser
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
             try
-                let pold = _requests(hstr)?
                 _logger(Info) and _logger.log("Use cached value for " + addr.string())
+                let pold = _requests(hstr)?
                 pold
             else
                 let pnew = Promise[Resolve]
@@ -163,3 +163,9 @@ actor Chooser
         """
         _logger(Info) and _logger.log("select on countries with " + dest_countries + " and forbidden:" + forbidden)
         _network.select_node_by_countries(p,_myID,_myCountry,dest_countries,forbidden)
+
+    be successful_connection(addr: InetAddrPort val,node: Node) =>
+        let hstr: String val = addr.host_str()
+        let pnew = Promise[Resolve]
+        _requests(hstr) = pnew
+        pnew([node])
