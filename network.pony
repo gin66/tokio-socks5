@@ -46,14 +46,8 @@ actor Network
             ni.country = country
         end
 
-    fun tag select_node_by_countries(myID: U8,destination_countries:String,
-                            forbidden_countries:String): Promise[Array[Node] val] =>
-        let p = Promise[Array[Node] val]
-        _select_node_by_countries(p,myID,destination_countries,forbidden_countries)
-        p
-
-    be _select_node_by_countries(p: Promise[Array[Node] val],
-                myID: U8,destination_countries:String,forbidden_countries:String) =>
+    be select_node_by_countries(p:Promise[Resolve],
+                myID: U8,myCountry:String,destination_countries:String,forbidden_countries:String) =>
         """
         Difficult to come up with the best node to use as internet connection.
         The selection should depend on node availability, distance of node to destination,
@@ -68,7 +62,12 @@ actor Network
         let candidates = recover iso Array[Node] end
 
         for (id,ni) in _nodes.pairs() do
-            if id != myID then
+            if id == myID then
+                if destination_countries.contains(myCountry) then
+                    p(DirectConnection)
+                    return
+                end
+            else
                 if not forbidden_countries.contains(ni.country) then
                     candidates.push(ni.node)
                     if destination_countries.contains(ni.country) then

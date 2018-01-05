@@ -162,24 +162,4 @@ actor Chooser
         The complex process to select the node is delegated to the network
         """
         _logger(Info) and _logger.log("select on countries with " + dest_countries + " and forbidden:" + forbidden)
-        let pids = _network.select_node_by_countries(_myID,dest_countries,forbidden)
-        pids.next[None]({(nodes:Array[Node tag] val) =>
-            _logger(Info) and _logger.log("list of nodes:" + nodes.size().string())
-            p(nodes)
-        })
-
-    be xxxx_selected_on_ip(p:Promise[Resolve],ip: U32,dest_country: String) =>
-        try
-            _logger(Info) and _logger.log(ip.string() + " => country: " + dest_country)
-            if _myCountry == dest_country then
-                _logger(Info) and _logger.log(ip.string() + " => DIRECT, because of country")
-                p(DirectConnection)
-                return
-            end
-
-            _logger(Info) and _logger.log(ip.string() + " => PROXY, no alternative in selected_on_ip")
-            let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
-            let proxies    = recover iso [proxy_addr] end
-            let id = _myID // TODO !!!
-            //p((id,consume proxies))
-        end
+        _network.select_node_by_countries(p,_myID,_myCountry,dest_countries,forbidden)
