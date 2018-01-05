@@ -14,8 +14,8 @@ class RouteInfo
     var sum_connection_ms: U64  = 0
     var sum_auth_ms:       U64  = 0
     var sum_establish_ms:  U64  = 0
-    var nr_roundtrips:    U32  = 0
-    var sum_roundtrip_ms: U64  = 0
+    var nr_roundtrips:     U32  = 0
+    var sum_roundtrip_ms:  U64  = 0
     var down:              Bool = false
     var down_count:        U32  = 0
 
@@ -183,7 +183,32 @@ actor Node
     be record_roundtrip_ms(route_id:USize,data_roundtrip_ms: U64) =>
         try
             let ri = _routes(route_id)?
-            ri.nr_roundtrips = ri.nr_roundtrips
+            ri.nr_roundtrips = ri.nr_roundtrips+1
             ri.sum_roundtrip_ms = ri.sum_roundtrip_ms + data_roundtrip_ms
         end
+        show_route_info()
 
+    fun ref show_route_info() =>
+       for ri in _routes.values() do 
+            let out = recover iso String(100) end
+            out.append("Roundtrips=#")
+            out.append(ri.nr_roundtrips.string())
+            out.append(": ")
+            out.append((F32.from[U64](ri.sum_roundtrip_ms)
+                        /F32.from[U32](ri.nr_roundtrips)).string())
+            out.append("ms, ")
+            out.append("Connections=#")
+            out.append(ri.nr_connections.string())
+            out.append(": connect=")
+            out.append((F32.from[U64](ri.sum_connection_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms, auth=")
+            out.append((F32.from[U64](ri.sum_auth_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms, established=")
+            out.append((F32.from[U64](ri.sum_establish_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms")
+
+            _logger(Info) and _logger.log(consume out)
+        end
