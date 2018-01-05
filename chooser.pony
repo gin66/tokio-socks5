@@ -30,6 +30,7 @@ actor Chooser
     let _network:   Network
     let _ipdb:      IpDB
     let _requests:  Map[String,Promise[Resolve]]
+    let _forbidden: Map[String,String] = Map[String,String]
     let _myID:      U8
     let _myCountry: String
     let _countries: String = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ "
@@ -109,39 +110,67 @@ actor Chooser
             error 
         })
 
+    be add_forbidden(key: String, forbidden:String) =>
+        _logger(Fine) and _logger.log("add forbidden " + key + ": " + forbidden)
+        _forbidden.update(key,forbidden)
+    
+    fun forbidden_by_hostname(hostname: String,domain: String): String =>
+        _forbidden.get_or_else(hostname,_forbidden.get_or_else(domain,""))
+
     be start_selection(p:Promise[Resolve],addr: InetAddrPort val) =>
         _logger(Info) and _logger.log("select path for destination " + addr.string())
         if addr.has_real_name then
             let hostname = addr.host_str()
             let parts = hostname.split(".")
+            let pn = parts.size()
+            let domain = (try "." + parts(pn-2)? + "." + parts(pn-1)? else hostname end)
 
-            let last: String val = (try parts(parts.size()-1)? else "" end).upper()
-            if (last.size() == 2) and _countries.contains(last + " ") then
-                _network.select_node_by_country(last,"CN")
-            end
+            let last: String val = (try parts(pn-1)? else "" end).upper()
             if _myCountry == last then
-                _logger(Info) and _logger.log(hostname + " => DIRECT, because of country")
+                _logger(Info) and _logger.log(hostname + " => DIRECT, because of country from hostname")
                 p(DirectConnection)
                 return
             end
-            _logger(Info) and _logger.log(hostname + " => PROXY, no alternative in start_selection")
-            try
-                let proxy_addr = recover val InetAddrPort.create_from_host_port("127.0.0.1:40002")? end
-                let proxies    = recover iso [proxy_addr] end
-                let id = _myID // TODO !!!
-                p((id,consume proxies))
+
+            let forbidden = forbidden_by_hostname(hostname.string(),domain)
+            _logger(Info) and _logger.log(hostname + " => forbidden countries: " + forbidden)
+            if (last.size() == 2) and _countries.contains(last + " ") then
+                select_on_countries(p,forbidden,last)
+            else
+                // Need to resolve hostname to ip(s)
+                let pdns = _network.dns_resolve(addr)
+                let me2 = recover this~_convert_ips_to_country(p,forbidden) end
+                pdns.next[None]({ (ips:Array[U32] val)(call=consume me2) =>
+                    call(ips) 
+                })
             end
         else
-            let ip = addr.u32()
-            let prom = _ipdb.locate(ip)
-            let me = recover this~selected_on_ip(p,ip) end
-            _logger(Info) and _logger.log("Find out country for " + ip.string())
-            prom.next[None]({(dest_country: String)(c=consume me) =>
-                c(dest_country)
-            })
+            _convert_ips_to_country(p,"",[addr.u32()])
         end
 
-    be selected_on_ip(p:Promise[Resolve],ip: U32,dest_country: String) =>
+    be _convert_ips_to_country(p:Promise[Resolve],forbidden:String,ips: Array[U32] val) =>
+        let prom = _ipdb.locate(ips)
+        let me = recover this~select_on_countries(p,forbidden) end
+        for ip in ips.values() do
+            _logger(Info) and _logger.log("Find out country for " + ip.string())
+        end
+        prom.next[None]({(dest_countries: String)(c=consume me) =>
+            c(dest_countries)
+        })
+
+    be select_on_countries(p:Promise[Resolve],forbidden:String,dest_countries: String) =>
+        """
+        At this point the destination has been mapped to a comma separated list of countries.
+        Eventually some countries are forbidden as derived from hostname analysis.
+        The complex process to select the node is delegated to the network
+        """
+        _logger(Info) and _logger.log("select on countries with " + dest_countries + " and forbidden:" + forbidden)
+        let pids = _network.select_node_by_countries(_myID,dest_countries,forbidden)
+        pids.next[None]({(ids:Array[U8] val) =>
+            _logger(Info) and _logger.log("list of ids:" + ids.size().string())
+        })
+
+    be xxxx_selected_on_ip(p:Promise[Resolve],ip: U32,dest_country: String) =>
         try
             _logger(Info) and _logger.log(ip.string() + " => country: " + dest_country)
             if _myCountry == dest_country then

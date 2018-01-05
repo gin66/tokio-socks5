@@ -5,6 +5,9 @@
 It shall be: A multi-server and multi-client vpn to internet showing up as socks5-proxy on client side
 
 The tokio-socks5 project has been used as a starter for the implementation.
+After having time have been wasted to figure out, how to implement this application with futures,
+finally this has been given. Instead of rust now the language pony is in use. This actor system
+is much more understandable and high performance is expected for this implementation 
 
 [![Build Status](https://travis-ci.org/gin66/uservpn-socks5.svg?branch=mba)](https://travis-ci.org/gin66/uservpn-socks5)
 
@@ -22,49 +25,57 @@ Solutions as per my knowledge:
 The first four make use of a tun- or tap-device. Thus root is needed on client and server, which is IMHO a drawback.
 
 ## Requirements
-* [ ] R.. Connected nodes form a uservpn
-* [ ] R.. Nodes are uniquely numbered (range 1-254)
-* [ ] R.. Nodes with socks5-proxy enabled are typically clients
-* [ ] R.. Nodes can have roaming IP/ports
-* [ ] R.. Nodes with fixed IPs are considered as servers
-* [ ] R.. Nodes with NAT-IPs are considered as temporary servers
-* [ ] R.. Working uservpn needs minimum one server
-* [ ] R.. Messages are exchanged/routed via Nodes. Hopcount max 3
-* [ ] R.. Every Node maintains list of all nodes
-* [ ] R.. Every Node can have more than one IP/port for communication
-* [ ] R.. Servers are assumed to have good internet connection
-* [ ] R.. Nodes inform each other about other nodes' IP/port
-* [ ] R.. Nodes with outdated info get updated information from up-to-date nodes
-* [ ] R.. Clients decide internet access point per site
-* [ ] R.. Clients use same server for selected site for whole session
-            => Rationale: Some internet sites lock login with IP
-* [ ] R.. Server/Client keeps tcp connections alive (e.g. empty data messages)
-* [ ] R.. Client uses socks protocol for its clients in order to avoid tcp-over-tcp problem
-* [ ] R.. Client multiplexes all TCP connections onto one byte stream per server
-* [ ] R.. Client uses one cache per server
-* [ ] R.. Out of band messages supported
-* [ ] R.. Node sink requests messages to be sent/resent
-* [ ] R.. Node communication uses encryption - ALL message bytes
-* [ ] R.. Encryption uses static shared key (no session authentication protocol)
-* [ ] R.. Two stage encryption of a message: Header and payload separately
-* [ ] R.. Encryption of header with watermarking
-* [ ] R.. Shared key and configuration stored in configuration file
-* [ ] R.. List of static servers (IP/port) as command line or configuration option
-* [ ] R.. Node communication is pluggable for protocols
-* [ ] R...Support node to node protocol: TCP
-* [ ] R...Support node to node protocol: UDP
-* [ ] R...Support node to node protocol: KCP ?
-* [ ] R.. Messages allow flight time to be measured
-* [ ] R.. Two Nodes aka Server-Client together implement socks5-proxy
-* [ ] R.. Language should be rust (for performance reasons) - not python
-* [ ] R.. Portion of traffic from client to server will be always sent via other nodes
-* [ ] R.. Autoupdate of all nodes triggered by node informing about latest SW
-* [ ] R.. SW distribution via github
-* [ ] R.. If a server dies, all connections via that server are dropped
-* [ ] R.. Both sides of a TCP communication send keep-alive packets e.g. 10 mins
-* [ ] R.. UDP as part of socks protocol is not supported  
-* [ ] R.. DNS never happens on a client
-* [ ] R.. Best server to access internet is determined e.g. by Geo-IP or just test
+
+[ ] R.. Connected nodes form a uservpn
+[X] R.. Nodes are uniquely numbered (range 1-254)
+[ ] R.. Nodes with socks5-proxy enabled are typically clients
+[ ] R.. Nodes can have roaming IP/ports
+[ ] R.. Nodes with fixed IPs are considered as servers
+[ ] R.. Nodes with NAT-IPs are considered as temporary servers
+[ ] R.. Working uservpn needs minimum one server
+[ ] R.. Messages are exchanged/routed via Nodes. Hopcount max 3
+[ ] R.. Every Node maintains list of all nodes
+[ ] R.. Every Node can have more than one IP/port for communication
+[ ] R.. Servers are assumed to have good internet connection
+[ ] R.. Nodes inform each other about other nodes' IP/port
+[ ] R.. Nodes with outdated info get updated information from up-to-date nodes
+[ ] R.. Clients decide internet access point per site
+[ ] R.. Clients use same server for selected site for whole session
+          => Rationale: Some internet sites lock login with IP
+[ ] R.. Server/Client keeps tcp connections alive (e.g. empty data messages)
+[ ] R.. Client uses socks protocol for its clients in order to avoid tcp-over-tcp problem
+[ ] R.. Client multiplexes all TCP connections onto one byte stream per server
+[ ] R.. Client uses one cache per server
+[ ] R.. Out of band messages supported
+[ ] R.. Node sink requests messages to be sent/resent
+[ ] R.. Node communication uses encryption - ALL message bytes
+[ ] R.. Encryption uses static shared key (no session authentication protocol)
+[ ] R.. Two stage encryption of a message: Header and payload separately
+[ ] R.. Encryption of header with watermarking
+[ ] R.. Shared key and configuration stored in configuration file
+[ ] R.. List of static servers (IP/port) as command line or configuration option
+[ ] R.. Node communication is pluggable for protocols
+[ ] R...Support node to node protocol: TCP
+[ ] R...Support node to node protocol: UDP
+[ ] R...Support node to node protocol: KCP ?
+[ ] R.. Messages allow flight time to be measured
+[ ] R.. Two Nodes aka Server-Client together implement socks5-proxy
+[ ] R.. Language should be rust (for performance reasons) - not python
+[ ] R.. Portion of traffic from client to server will be always sent via other nodes
+[ ] R.. Autoupdate of all nodes triggered by node informing about latest SW
+[ ] R.. SW distribution via github
+[ ] R.. If a server dies, all connections via that server are dropped
+[ ] R.. Both sides of a TCP communication send keep-alive packets e.g. 10 mins
+[ ] R.. UDP as part of socks protocol is not supported  
+[ ] R.. DNS never happens on a client
+[ ] R.. Best server to access internet is determined e.g. by Geo-IP or just test
+[ ] R.. To evaluate a connection the first roundtrip time in ms is evaluated.
+          This roundtrip is defined as the time difference between
+          first reply data message to the last sent data message
+          For http: completed HTTP-Request to start of HTTP-Reply.
+        Drawback: The http server performance is included.
+        Remedy:   Only use averaged data. 
+        BTW: international roundtrip time is more than server processing
 
 ## Usage - OUTDATED
 

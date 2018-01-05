@@ -53,9 +53,12 @@ actor Main
       let myID = sections("Self")?("myID")?.u8()?
       let myCountry = sections("Self")?("myCountry")?
 
-      let network = Network(logger)
+      let network = Network(auth,logger)
       // Only clients need a chooser !!!
       let chooser = Chooser(network,ipdb,myID,myCountry,logger)
+      for (key,forbidden) in sections("Forbidden")?.pairs() do
+        chooser.add_forbidden(key,forbidden)
+      end
 
       // Loop twice over the Nodes section. 
       // First for other nodes and then for myself
