@@ -40,6 +40,12 @@ actor Network
             _nodes(id) = (country,node)
         end
 
+    be connect_to_probe(dialer:Dialer, node_id: U8, route_id: USize) =>
+        try
+            (let country,let node) = _nodes(node_id)?
+            node.connect_socks5_to_probe(dialer,route_id)
+        end
+
     be select_node_by_countries(p:Promise[Resolve],
                 myID: U8,myCountry:String,
                 forbidden_countries:String,

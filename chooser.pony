@@ -72,8 +72,6 @@ actor Chooser
         _logger(Fine) and _logger.log(_conn_count.string() + ": select path for destination " + addr.string())
 
         let iu = addr.u32()
-        _logger(Info) and _logger.log(_conn_count.string() 
-                             + ": " + iu.string() )
         if (iu > 0) and (iu < 65535) then
             // This is a special IP used to probe a specific connection
             //      0.0.node.route_id
@@ -82,8 +80,8 @@ actor Chooser
             _logger(Info) and _logger.log(_conn_count.string() 
                              + ": PROBE connect via " + node_id.string() 
                                                 + "/" + route_id.string())
-            //_network.connect_to_probe(dialer,node_id,route_id)
-            //return                                                
+            _network.connect_to_probe(dialer,node_id,route_id)
+            return                                                
         end
 
         let p: Promise[Resolve] = (
