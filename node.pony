@@ -12,6 +12,7 @@ type Connection is (  DirectConnection | TCPUDPchannel | SocksConnection)
 class RouteInfo
     let connection: Connection
     let socks:             (None|InetAddrPort val)
+    let id:                USize
     var nr_connections:    U32  = 0
     var sum_connection_ms: U64  = 0
     var sum_auth_ms:       U64  = 0
@@ -24,13 +25,19 @@ class RouteInfo
     var total_rx_count:    USize= 0
     var last_connection_ms:U64  = 0
 
-    new trn create(connection': Connection, socks': (None|InetAddrPort iso) = None) =>
+    new trn create(connection': Connection, 
+                   id': USize,
+                   socks': (None|InetAddrPort iso) = None) =>
         connection = connection'
+        id = id'
         if socks' is None then
             socks = None
         else 
             socks = consume socks'
         end
+
+    fun kpi(): U64 =>
+        sum_roundtrip_ms/U64.from[U32](nr_roundtrips)
 
 class NodeBuilder
     let _network: Network
@@ -90,7 +97,6 @@ actor Node
     let _logger:  Logger[String]
     // This node is reachable via client accessible socks proxy
     let _routes: Array[RouteInfo ref] = Array[RouteInfo ref]
-    var _connection_count: USize = 0
     var _proxy_host: String = ""
     var _proxy_port: String = ""
 
@@ -154,23 +160,45 @@ actor Node
 
     be add_socks_proxy(ia: InetAddrPort iso) =>
         let conn = SocksConnection
-        let ri = recover iso RouteInfo(consume conn,consume ia) end
+        let id = _routes.size()
+        let ri = recover iso RouteInfo(consume conn, id, consume ia) end
         _routes.push(consume ri)
 
     be set_proxy(host: String,port:String) =>
         _proxy_host = host
         _proxy_port = port
 
+    fun choose_route(): USize =>
+        let rts = Array[(USize,U64)]
+        for ri in _routes.values() do
+            rts.push( (ri.id,ri.kpi()) )
+        end
+        var change = true
+        while change do
+            change = false
+            try
+                for i in Range(0,rts.size()-1) do
+                    (let b0,let k0) = rts(i)?
+                    (let b1,let k1) = rts(i+1)?
+                    if k0 > k1 then
+                        change = true
+                        rts(i)? = rts(i+1)? = rts(i)?
+                    end
+                end
+            end
+        end
+        try
+            (let b0,let k0) = rts(0)?
+            b0
+        else
+            0
+        end
+
     be provide_connection_to_you(dialer: Dialer,conn: TCPConnection,
                                  rid: USize = -1) =>
         _logger(Fine) and _logger.log("Provide connection to "+_name)
         try
-            _connection_count = _connection_count + 1
-            let route_id = (if rid == -1 then
-                                _connection_count % _routes.size()
-                            else
-                                rid
-                            end)
+            let route_id = (if rid == -1 then choose_route() else rid end)
             let route = _routes(route_id)?
             match route.connection
             | SocksConnection =>
@@ -196,7 +224,6 @@ actor Node
             ri.down = true
             ri.down_count = ri.down_count+1
         end
-        show_route_info(route_id)
 
     be record_established_connection(route_id:USize,
                                      conn_ms:U64,auth_ms:U64,established_ms:U64) =>
@@ -216,60 +243,56 @@ actor Node
         end
 
     be connection_closed(route_id: USize,tx_bytes: USize,rx_bytes: USize) =>
-        show_route_info(route_id)
         try
             let ri = _routes(route_id)?
+            show_route_info(ri)
             ri.last_connection_ms = Time.millis()
             ri.total_tx_count = ri.total_tx_count + tx_bytes
             ri.total_tx_count = ri.total_tx_count + tx_bytes
         end
 
-    fun ref show_route_info(route_id: USize) =>
+    fun box show_route_info(ri: RouteInfo ref) =>
         if _logger(Info) then
-            try
-                let out = recover iso String(100) end
-                let ri = _routes(route_id)?
-                out.append(_name)
-                out.append("-")
-                out.append(route_id.string())
-                out.append("=> Down=#")
-                out.append(ri.down_count.string())
-                out.append(" Rounds=#")
-                out.append(ri.nr_roundtrips.string())
-                out.append(": ")
-                out.append((F32.from[U64](ri.sum_roundtrip_ms)
-                            /F32.from[U32](ri.nr_roundtrips)).string())
-                out.append("ms, ")
-                out.append("Conns=#")
-                out.append(ri.nr_connections.string())
-                out.append(": conn=")
-                out.append((F32.from[U64](ri.sum_connection_ms)
-                            /F32.from[U32](ri.nr_connections)).string())
-                out.append("ms, auth=")
-                out.append((F32.from[U64](ri.sum_auth_ms)
-                            /F32.from[U32](ri.nr_connections)).string())
-                out.append("ms, estd=")
-                out.append((F32.from[U64](ri.sum_establish_ms)
-                            /F32.from[U32](ri.nr_connections)).string())
-                out.append("ms")
-                _logger.log(consume out)
-            end
+            let out = recover iso String(100) end
+            out.append(_name)
+            out.append("-")
+            out.append(ri.id.string())
+            out.append("=> Down=#")
+            out.append(ri.down_count.string())
+            out.append(" Rounds=#")
+            out.append(ri.nr_roundtrips.string())
+            out.append(": ")
+            out.append((F32.from[U64](ri.sum_roundtrip_ms)
+                        /F32.from[U32](ri.nr_roundtrips)).string())
+            out.append("ms, ")
+            out.append("Conns=#")
+            out.append(ri.nr_connections.string())
+            out.append(": conn=")
+            out.append((F32.from[U64](ri.sum_connection_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms, auth=")
+            out.append((F32.from[U64](ri.sum_auth_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms, estd=")
+            out.append((F32.from[U64](ri.sum_establish_ms)
+                        /F32.from[U32](ri.nr_connections)).string())
+            out.append("ms")
+            _logger.log(consume out)
         end
 
     be timer_event_1minute() =>
-        _logger(Info) and _logger.log("Minute Event")
-        for route_id in Range(0,_routes.size()) do
-            show_route_info(route_id)
-
-            try
-                if _routes(route_id)?.connection is SocksConnection then
+        _logger(Info) and _logger.log("Minute Event for " + _name)
+        let now_ms = Time.millis()
+        for ri in _routes.values() do
+            show_route_info(ri)
+            if ri.connection is SocksConnection then
+                if now_ms > (ri.last_connection_ms + 90_000) then
                     TCPConnection(_auth,
                         Socks5ProbeTCPConnectionNotify(_probe,
-                                    _id,route_id,_logger),
+                                    _id,ri.id,_logger),
                         _proxy_host,
                         _proxy_port
                         where init_size=16384,max_size = 16384)
-                    None
                 end
             end
         end
