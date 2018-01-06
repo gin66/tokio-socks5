@@ -26,9 +26,9 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 
 ## Requirements
 
-- [ ] R.. Connected nodes form a uservpn
+- [ ] R.. Connected nodes form a uservpn
 - [X] R.. Nodes are uniquely numbered (range 1-254)
-- [ ] R.. Nodes with socks5-proxy enabled are typically clients
+- [ ] R.. Nodes with socks5-proxy enabled are typically clients
 - [ ] R.. Nodes can have roaming IP/ports
 - [ ] R.. Nodes with fixed IPs are considered as servers
 - [ ] R.. Nodes with NAT-IPs are considered as temporary servers
@@ -44,13 +44,13 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
           => Rationale: Some internet sites lock login with IP
 - [ ] R.. Server/Client keeps tcp connections alive (e.g. empty data messages)
 - [ ] R.. Client uses socks protocol for its clients in order to avoid tcp-over-tcp problem
-- [ ] R.. Client multiplexes all TCP connections onto one byte stream per server
+- [ ] R.. Client multiplexes all TCP connections onto one byte stream per server
 - [ ] R.. Client uses one cache per server
 - [ ] R.. Out of band messages supported
 - [ ] R.. Node sink requests messages to be sent/resent
 - [ ] R.. Node communication uses encryption - ALL message bytes
 - [ ] R.. Encryption uses static shared key (no session authentication protocol)
-- [ ] R.. Two stage encryption of a message: Header and payload separately
+- [ ] R.. Two stage encryption of a message: Header and payload separately
 - [ ] R.. Encryption of header with watermarking
 - [ ] R.. Shared key and configuration stored in configuration file
 - [ ] R.. List of static servers (IP/port) as command line or configuration option
