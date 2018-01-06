@@ -34,6 +34,21 @@ primitive Socks5
     fun reply_cmd_not_supported():U8 => 7
     fun reply_atyp_not_supported():U8 => 8
 
+    fun make_request_ipv4(ip: (U8,U8,U8,U8)): Array[U8] iso^ =>
+        let req: Array[U8] iso = recover Array[U8](10) end
+        (let ip1,let ip2,let ip3,let ip4) = ip
+        req.push(Socks5.version())
+        req.push(Socks5.cmd_connect())
+        req.push(0)
+        req.push(Socks5.atyp_ipv4())
+        req.push(ip1)
+        req.push(ip2)
+        req.push(ip3)
+        req.push(ip4)
+        req.push(0)
+        req.push(80)
+        consume req
+
     fun make_request(host: String): Array[U8] iso^ =>
         let req: Array[U8] iso = recover Array[U8](host.size()+7) end
         req.push(Socks5.version())
@@ -267,14 +282,17 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
 class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
     var _state:    Socks5ClientState
     let _host:     String
+    let _host_id:  U8
+    let _route_id: U8
     let _logger:   Logger[String]
 
     new iso create(probe_host:String,host_id:U8,route_id:USize,
                         logger: Logger[String]) =>
         _state    = Socks5WaitConnect
         _host     = probe_host
+        _host_id  = host_id
+        _route_id = U8.from[USize](route_id)
         _logger   = logger
-
 
     fun ref connect_failed(conn: TCPConnection ref) =>
         _logger(Info) and _logger.log("Probe connection to socks proxy failed")
@@ -298,7 +316,8 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
                 if data(1)? != Socks5.meth_no_auth() then error end
                 _logger(Info) and _logger.log("Reply from socks proxy OK")
                 _state = Socks5WaitReply
-                let msg = recover Socks5.make_request(_host) end
+                let ip: (U8,U8,U8,U8) = (0,0,_host_id,_route_id)
+                let msg = recover Socks5.make_request_ipv4(ip) end
                 conn.write(consume msg)
                 return false
             end
