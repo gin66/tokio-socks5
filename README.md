@@ -35,7 +35,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 - [ ] R.. Working uservpn needs minimum one server
 - [ ] R.. Messages are exchanged/routed via Nodes. Hopcount max 3
 - [ ] R.. Every Node maintains list of all nodes
-- [ ] R.. Every Node can have more than one IP/port for communication
+- [ ] R.. Every Node can have more than one IP/port for communication
 - [ ] R.. Servers are assumed to have good internet connection
 - [ ] R.. Nodes inform each other about other nodes' IP/port
 - [ ] R.. Nodes with outdated info get updated information from up-to-date nodes
