@@ -1,4 +1,5 @@
 use "net"
+use "time"
 use "logger"
 use "promises"
 use "collections"
@@ -6,6 +7,15 @@ use "collections"
 type Resolve is (DirectConnection | Array[Node tag] val)
 
 type NodeInfoMap is (String,Node tag)
+
+class Notify is TimerNotify
+    let _network: Network
+    new iso create(network: Network) =>
+        _network = network
+
+    fun ref apply(timer: Timer, count: U64): Bool =>
+        _network.timer_event_1minute()
+        true
 
 actor Network
     let _auth:    AmbientAuth val
@@ -16,6 +26,14 @@ actor Network
     new create(auth: AmbientAuth val, logger: Logger[String]) =>
         _auth   = auth
         _logger = logger
+        let timers = Timers
+        let timer = Timer(Notify(this), 30_000_000_000, 60_000_000_000) // MAGIC: once per minute
+        timers(consume timer)
+
+    be timer_event_1minute() =>
+        for (country,node) in _nodes.values() do
+            node.timer_event_1minute()
+        end
 
     be add_node(node_id: U8, node: Node tag,country: String) =>
         _nodes.update(node_id,(country,node))
