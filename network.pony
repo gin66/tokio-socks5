@@ -83,6 +83,12 @@ actor Network
         """
         _logger(Fine) and _logger.log("Select node by country destination/forbidden: "
                                         + destination_countries + "/" + forbidden_countries)
+
+        if destination_countries == "ZZ" then
+            p(DirectConnection)
+            return
+        end
+        
         let nodes = recover iso Array[Node] end
         let candidates = recover iso Array[Node] end
 
