@@ -69,7 +69,7 @@ actor Chooser
         In order to do so, the promise to be replaced by the result or only the node info.
         """
         _conn_count = _conn_count+1
-        _logger(Info) and _logger.log(_conn_count.string() + ": select path for destination " + addr.string())
+        _logger(Fine) and _logger.log(_conn_count.string() + ": select path for destination " + addr.string())
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
             try
