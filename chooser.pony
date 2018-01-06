@@ -30,6 +30,7 @@ actor Chooser
     let _forbidden: Map[String,String] = Map[String,String]
     let _myID:      U8
     let _myCountry: String
+    var _conn_count:U32 = 0
     let _countries: String = "AD AE AF AG AI AL AM AO AQ AR AS AT AU AW AX AZ "
                             +"BA BB BD BE BF BG BH BI BJ BL BM BN BO BQ BR BS BT BV BW BY BZ "
                             +"CA CC CD CF CG CH CI CK CL CM CN CO CR CU CV CW CX CY CZ "
@@ -67,17 +68,18 @@ actor Chooser
         BTW: In case node goes down, that host to be removed from the _requests cache.
         In order to do so, the promise to be replaced by the result or only the node info.
         """
-        _logger(Info) and _logger.log("select path for destination " + addr.string())
+        _conn_count = _conn_count+1
+        _logger(Info) and _logger.log(_conn_count.string() + ": select path for destination " + addr.string())
         let p: Promise[Resolve] = (
             let hstr: String val = addr.host_str()
             try
                 let pold = _requests(hstr)?
-                _logger(Info) and _logger.log("Use cached value for " + addr.string()) // must be here
+                _logger(Fine) and _logger.log("Use cached value for " + addr.string()) // must be here
                 pold
             else
                 let pnew = Promise[Resolve]
                 _requests(hstr) = pnew
-                _logger(Info) and _logger.log("Have " + 
+                _logger(Fine) and _logger.log("Have " + 
                     _requests.size().string() + " values in cache")
                 pnew.timeout(5_000_000_000) // MAGIC NUMBER
                 let me = recover tag this end
@@ -115,7 +117,7 @@ actor Chooser
         _forbidden.get_or_else(hostname,_forbidden.get_or_else(domain,""))
 
     be start_selection(p:Promise[Resolve],addr: InetAddrPort val) =>
-        _logger(Info) and _logger.log("select path for destination " + addr.string())
+        _logger(Fine) and _logger.log("select path for destination " + addr.string())
         if addr.has_real_name then
             let hostname = addr.host_str()
             let parts = hostname.split(".")
@@ -124,13 +126,13 @@ actor Chooser
 
             let last: String val = (try parts(pn-1)? else "" end).upper()
             if _myCountry == last then
-                _logger(Info) and _logger.log(hostname + " => DIRECT, because of country from hostname")
+                _logger(Fine) and _logger.log(hostname + " => DIRECT, because of country from hostname")
                 p(DirectConnection)
                 return
             end
 
             let forbidden = forbidden_by_hostname(hostname.string(),domain)
-            _logger(Info) and _logger.log(hostname + " => forbidden countries: " + forbidden)
+            _logger(Fine) and _logger.log(hostname + " => forbidden countries: " + forbidden)
             if (last.size() == 2) and _countries.contains(last + " ") then
                 _network.select_node_by_countries(p,_myID,_myCountry,last,forbidden)
             else
@@ -148,7 +150,7 @@ actor Chooser
     be _convert_ips_to_country(p:Promise[Resolve],forbidden:String,ips: Array[U32] val) =>
         let prom = _ipdb.locate(ips)
         for ip in ips.values() do
-            _logger(Info) and _logger.log("Find out country for " + ip.string())
+            _logger(Fine) and _logger.log("Find out country for " + ip.string())
         end
         prom.next[None]({(dest_countries: String) =>
             """
@@ -156,7 +158,7 @@ actor Chooser
             Eventually some countries are forbidden as derived from hostname analysis.
             The complex process to select the node is delegated to the network
             """
-            _logger(Info) and _logger.log("Destination countries: " + dest_countries)
+            _logger(Fine) and _logger.log("Destination countries: " + dest_countries)
             _network.select_node_by_countries(p,_myID,_myCountry,forbidden,dest_countries)
         })
 
