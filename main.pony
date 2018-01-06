@@ -47,7 +47,7 @@ actor Main
       let ipdb = IpDB(logger)
       ipdb.start_load(FilePath(auth,"dbip-country-2017-12.csv")?)
 
-      logger(Info) and logger.log("Load ini-file")
+      logger(Fine) and logger.log("Load ini-file")
       let ini_file = File(FilePath(auth, "config.ini")?)
       let sections = IniParse(ini_file.lines())?
       let myID = sections("Self")?("myID")?.u8()?

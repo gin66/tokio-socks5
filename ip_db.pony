@@ -25,10 +25,10 @@ actor IpDB
             let rex = recover Regex(ip + "," + ip + ",\"([A-Z][A-Z])\"")? end
             match recover OpenFile(filename) end
             | let file: File iso =>
-                _logger(Info) and _logger.log("Start load of Geo IP database")
+                _logger(Fine) and _logger.log("Start load of Geo IP database")
                 process_chunk(consume file,consume rex)
             else
-                _logger(Info) and _logger.log("Error opening file '" + filename.path + "'")
+                _logger(Fine) and _logger.log("Error opening file '" + filename.path + "'")
             end
         end
 
@@ -64,7 +64,7 @@ actor IpDB
             end
             process_chunk(consume file,consume rex)
         else
-            _logger(Info) and _logger.log("Geo IP database load completed")
+            _logger(Fine) and _logger.log("Geo IP database load completed")
             _is_loaded = true
             try 
                 while true do
@@ -84,7 +84,7 @@ actor IpDB
             let countries = recover iso String(3*ips.size()) end
             for ip in ips.values() do
                let country = _u16_to_country(_locate(ip))
-                _logger(Info) and _logger.log("Country for " + ip.string() + " is " + country)
+                _logger(Fine) and _logger.log("Country for " + ip.string() + " is " + country)
                 if not countries.contains(country) then
                     if countries.size() > 0 then
                         countries.append(",")

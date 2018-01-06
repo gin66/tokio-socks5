@@ -26,7 +26,7 @@ actor Network
             (let country,let node) = _nodes(to_id)?
             node.add_socks_proxy(consume ia)
         else
-            _logger(Info) and _logger.log("Cannot find node " + to_id.string() + " for " + consume addr)
+            _logger(Fine) and _logger.log("Cannot find node " + to_id.string() + " for " + consume addr)
         end
 
     be display() =>
@@ -52,7 +52,7 @@ actor Network
         UCP/TCP channel, socks-channel with different roundtrip time.
         Finally, what happens if the selected node just has gone down !?
         """
-        _logger(Info) and _logger.log("Select node by country destination/forbidden: "
+        _logger(Fine) and _logger.log("Select node by country destination/forbidden: "
                                         + destination_countries + "/" + forbidden_countries)
         let nodes = recover iso Array[Node] end
         let candidates = recover iso Array[Node] end
@@ -71,14 +71,14 @@ actor Network
                         nodes.push(node)
                     end
                 end
-                _logger(Info) and _logger.log(country 
+                _logger(Fine) and _logger.log(country 
                             + "=> " + nodes.size().string() + "/" + candidates.size().string())
             end
         end
         let select = (if nodes.size() == 0 then consume candidates else consume nodes end)
         _scnt = _scnt+1
         let i = _scnt % select.size()
-        _logger(Info) and _logger.log("Number of nodes: " + select.size().string())
+        _logger(Fine) and _logger.log("Number of nodes: " + select.size().string())
         p(consume select)
 
     fun tag dns_resolve(ia: InetAddrPort val): Promise[Array[U32] val] =>

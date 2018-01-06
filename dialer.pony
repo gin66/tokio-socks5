@@ -62,7 +62,7 @@ actor Dialer
         _chooser.select_connection(this, _addr)
 
     be roundtrip_ms(data_round_trip_ms: U64) =>
-        _logger(Info) and _logger.log("Data roundtrip in ms:" + data_round_trip_ms.string())
+        _logger(Fine) and _logger.log("Data roundtrip in ms:" + data_round_trip_ms.string())
         try 
             let node = _nodes(_node_i)?
             _chooser.successful_connection(_addr,node)
@@ -110,7 +110,7 @@ actor Dialer
         end
 
     be connect_socks5_to(nodes: Array[Node tag] val) =>
-        _logger(Info) and _logger.log("called connect_socks5_to")
+        _logger(Fine) and _logger.log("called connect_socks5_to")
         _nodes = nodes
         try_next_node()
 
@@ -119,7 +119,7 @@ actor Dialer
         Connection to a socks proxy has succeeded. Send him the original socks_request.
         All else is just protocol
         """
-        _logger(Info) and _logger.log("Outgoing socks connection succeeded")
+        _logger(Fine) and _logger.log("Outgoing socks connection succeeded")
         _conn.set_notify(DirectForwardTCPConnectionNotify(
                                 this,peer,true  where logger = _logger))
         let x = recover Array[U8](_request.size()) end
@@ -127,13 +127,13 @@ actor Dialer
             x.push(try _request(i)? else 0 end)
         end
         peer.write(consume x)
-        _logger(Info) and _logger.log("Sent request to socks proxy")
+        _logger(Fine) and _logger.log("Sent request to socks proxy")
 
     be outgoing_socks_connection_established(route_id:USize,
                                              conn_ms: U64,
                                              auth_ms: U64,
                                              established_ms: U64) => 
-        _logger(Info) and _logger.log("Timing till connect/auth/complete: "
+        _logger(Fine) and _logger.log("Timing till connect/auth/complete: "
                                      +       conn_ms.string()
                                      + "/" + auth_ms.string()
                                      + "/" + established_ms.string()
@@ -145,7 +145,7 @@ actor Dialer
         end
 
     be outgoing_socks_connection_failed(route_id:USize,conn: TCPConnection) => 
-        _logger(Info) and _logger.log("Outgoing socks connection failed")
+        _logger(Fine) and _logger.log("Outgoing socks connection failed")
         try_next_node()
         _route_id = route_id
         try 

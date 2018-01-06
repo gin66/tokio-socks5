@@ -60,15 +60,15 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
             end
             match _state
             | Socks5WaitInit =>
-                _logger(Info) and _logger.log("Received handshake")
+                _logger(Fine) and _logger.log("Received handshake")
                 if data(0)? != Socks5.version() then error end
                 if data.size() != (USize.from[U8](data(1)?) + 2) then error end
                 data.find(Socks5.meth_no_auth(), 2)?
-                _logger(Info) and _logger.log("Send initial response")
+                _logger(Fine) and _logger.log("Send initial response")
                 conn.write([Socks5.version();Socks5.meth_no_auth()])
                 _state = Socks5WaitRequest
             | Socks5WaitRequest =>
-                _logger(Info) and _logger.log("Received address")
+                _logger(Fine) and _logger.log("Received address")
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.cmd_connect() then
                     data(1)? = Socks5.reply_cmd_not_supported()
@@ -105,7 +105,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                 Dialer(_auth,_chooser,conn,consume addr,consume data,_logger)
                 _state = Socks5WaitConnect
             | Socks5WaitConnect=>
-                _logger(Info) and _logger.log("Received data, while waiting for connection")
+                _logger(Fine) and _logger.log("Received data, while waiting for connection")
                 error
                 //conn.write(String.from_array(consume data))
             end
@@ -134,7 +134,7 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
         None
 
     fun ref closed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
 
 class SocksTCPListenNotify is TCPListenNotify
     let _auth: AmbientAuth val
@@ -150,13 +150,13 @@ class SocksTCPListenNotify is TCPListenNotify
         SocksTCPConnectionNotify(_auth, _chooser, _logger)
 
     fun ref listening(listen: TCPListener ref) =>
-        _logger(Info) and _logger.log("Successfully bound to address")
+        _logger(Fine) and _logger.log("Successfully bound to address")
 
     fun ref not_listening(listen: TCPListener ref) =>
-        _logger(Info) and _logger.log("Cannot bind to listen address")
+        _logger(Fine) and _logger.log("Cannot bind to listen address")
 
     fun ref closed(listen: TCPListener ref) =>
-        _logger(Info) and _logger.log("Successfully closed TCP listeners")
+        _logger(Fine) and _logger.log("Successfully closed TCP listeners")
 
 
 class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
@@ -185,11 +185,11 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
         _logger   = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection to socks proxy failed")
+        _logger(Fine) and _logger.log("Connection to socks proxy failed")
         _dialer.outgoing_socks_connection_failed(_route_id,conn)
 
     fun ref connected(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection to socks proxy succeeded")
+        _logger(Fine) and _logger.log("Connection to socks proxy succeeded")
         _state  = Socks5WaitMethodSelection
         _conn_ms = Time.millis() - _start_ms
         conn.write([Socks5.version();1;Socks5.meth_no_auth()])
@@ -199,7 +199,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
             data: Array[U8] iso,
             times: USize)
             : Bool =>
-        _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
+        _logger(Fine) and _logger.log("Received " + data.size().string() + " Bytes")
         _rx_bytes = _rx_bytes + data.size()
         match _state
         | Socks5WaitMethodSelection =>
@@ -207,7 +207,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
                 if data.size() != 2 then error end
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.meth_no_auth() then error end
-                _logger(Info) and _logger.log("Reply from socks proxy OK")
+                _logger(Fine) and _logger.log("Reply from socks proxy OK")
                 _auth_ms = Time.millis() - _start_ms
                 _state = Socks5WaitReply
                 _dialer.outgoing_socks_connection_succeeded(conn)
@@ -215,7 +215,7 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
             end
         | Socks5WaitReply =>
             try
-                _logger(Info) and _logger.log("Reply from socks proxy received")
+                _logger(Fine) and _logger.log("Reply from socks proxy received")
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
                 let delta_ms = Time.millis() - _start_ms
@@ -247,5 +247,5 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
         _peer.unmute()
 
     fun ref closed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()

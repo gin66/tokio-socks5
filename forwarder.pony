@@ -36,7 +36,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         This function is only called, if this is an outgoing connection !!!
         On connect the (socks) peer is informed about successful connection.
         """
-        _logger(Info) and _logger.log("Outgoing connection established")
+        _logger(Fine) and _logger.log("Outgoing connection established")
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let data = _conn_data = consume empty
         try data(1)? = Socks5.reply_ok() end
@@ -47,7 +47,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         This function is only called, if this is an outgoing connection !!!
         On connect failure the (socks) peer is closed
         """
-        _logger(Info) and _logger.log("Connection failed")
+        _logger(Fine) and _logger.log("Connection failed")
         let empty: Array[U8] iso = recover iso Array[U8]() end
         let data = _conn_data = consume empty
         try data(1)? = Socks5.reply_conn_refused() end
@@ -59,9 +59,11 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             data: Array[U8] iso,
             times: USize)
             : Bool =>
-        _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
+        _logger(Fine) and _logger.log("Received " + data.size().string() + " Bytes")
         _rx_bytes = _rx_bytes + data.size()
-        _last_sent_ms = Time.millis() // "last_sent" to the internet host, thus receive here
+        if _first_received_ms == 0 then
+            _last_sent_ms = Time.millis() // "last_sent" to the internet host, thus receive here
+        end
         _peer.write(consume data)
         false
 
@@ -69,6 +71,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             conn: TCPConnection ref,
             data: (String val | Array[U8] val))
             : (String val | Array[U8 val] val) =>
+        _logger(Info) and _logger.log("Sent " + data.size().string() + " Bytes")
         _tx_bytes = _tx_bytes + data.size()
         if (_first_received_ms == 0) and (_last_sent_ms != 0) then
             _first_received_ms = Time.millis()
@@ -85,5 +88,5 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
         _peer.unmute()
 
     fun ref closed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
+        _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()
