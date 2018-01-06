@@ -151,7 +151,8 @@ actor Node
         let ri = recover iso RouteInfo(consume conn,consume ia) end
         _routes.push(consume ri)
 
-    be provide_connection_to_you(dialer: Dialer,conn: TCPConnection) =>
+    be provide_connection_to_you(dialer: Dialer,conn: TCPConnection,
+                                 route_id: USize = -1) =>
         _logger(Fine) and _logger.log("Provide connection to "+_name)
         connection_count = connection_count + 1
         let route_id = connection_count % _routes.size()
