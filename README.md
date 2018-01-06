@@ -28,7 +28,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 
 - [ ] R.. Connected nodes form a uservpn
 - [X] R.. Nodes are uniquely numbered (range 1-254)
-- [ ] R.. Nodes with socks5-proxy enabled are typically clients
+- [X] R.. Nodes with socks5-proxy enabled are typically clients
 - [ ] R.. Nodes can have roaming IP/ports
 - [ ] R.. Nodes with fixed IPs are considered as servers
 - [ ] R.. Nodes with NAT-IPs are considered as temporary servers
@@ -43,7 +43,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 - [ ] R.. Clients use same server for selected site for whole session
           => Rationale: Some internet sites lock login with IP
 - [ ] R.. Server/Client keeps tcp connections alive (e.g. empty data messages)
-- [ ] R.. Client uses socks protocol for its clients in order to avoid tcp-over-tcp problem
+- [X] R.. Client uses socks protocol for its clients in order to avoid tcp-over-tcp problem
 - [ ] R.. Client multiplexes all TCP connections onto one byte stream per server
 - [ ] R.. Client uses one cache per server
 - [ ] R.. Out of band messages supported
@@ -60,7 +60,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 - [ ] R...Support node to node protocol: KCP ?
 - [ ] R.. Messages allow flight time to be measured
 - [ ] R.. Two Nodes aka Server-Client together implement socks5-proxy
-- [ ] R.. Language should be rust (for performance reasons) - not python
+- [ ] R.. Language should be pony (for performance reasons) - not python
 - [ ] R.. Portion of traffic from client to server will be always sent via other nodes
 - [ ] R.. Autoupdate of all nodes triggered by node informing about latest SW
 - [ ] R.. SW distribution via github
@@ -69,13 +69,13 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 - [ ] R.. UDP as part of socks protocol is not supported  
 - [ ] R.. DNS never happens on a client
 - [ ] R.. Best server to access internet is determined e.g. by Geo-IP or just test
-- [ ] R.. To evaluate a connection the first roundtrip time in ms is evaluated.
+- [X] R.. To evaluate a connection the first roundtrip time in ms is evaluated.
           This roundtrip is defined as the time difference between
           first reply data message to the last sent data message
           For http: completed HTTP-Request to start of HTTP-Reply.
-        Drawback: The http server performance is included.
-        Remedy:   Only use averaged data. 
-        BTW: international roundtrip time is more than server processing
+          Drawback: The http server performance is included.
+          Remedy:   Only use averaged data. 
+          BTW: international roundtrip time is more than server processing
 
 ## Usage - OUTDATED
 
