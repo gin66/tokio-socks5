@@ -64,7 +64,7 @@ actor IpDB
             end
             process_chunk(consume file,consume rex)
         else
-            _logger(Fine) and _logger.log("Geo IP database load completed")
+            _logger(Info) and _logger.log("Geo IP database load completed")
             _is_loaded = true
             try 
                 while true do
