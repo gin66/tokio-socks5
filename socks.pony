@@ -34,6 +34,20 @@ primitive Socks5
     fun reply_cmd_not_supported():U8 => 7
     fun reply_atyp_not_supported():U8 => 8
 
+    fun make_request(host: String): Array[U8] iso^ =>
+        let req: Array[U8] iso = recover Array[U8](host.size()+7) end
+        req.push(Socks5.version())
+        req.push(Socks5.cmd_connect())
+        req.push(0)
+        req.push(Socks5.atyp_domain())
+        req.push(U8.from[USize](host.size()))
+        for ch in host.values() do
+            req.push(ch)
+        end
+        req.push(0)
+        req.push(80)
+        consume req
+
 class SocksTCPConnectionNotify is TCPConnectionNotify
     let _auth:     AmbientAuth val
     let _chooser:  Chooser
