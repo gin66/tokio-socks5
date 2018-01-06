@@ -307,7 +307,7 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
             data: Array[U8] iso,
             times: USize)
             : Bool =>
-        _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
+        _logger(Fine) and _logger.log("Received " + data.size().string() + " Bytes")
         match _state
         | Socks5WaitMethodSelection =>
             try
@@ -337,9 +337,9 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
                 return false
             end
         | Socks5PassThrough =>
-            _logger(Info) and _logger.log("Reply:\n")
-            _logger.log(String.from_array(consume data))
-            return false
+            _logger(Info) and _logger.log("Received reply:" + data.size().string())
+            //_logger.log(String.from_array(consume data))
+            //return false .... fall through and close connection
         end
         conn.dispose()
         false
