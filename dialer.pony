@@ -95,6 +95,13 @@ actor Dialer
                             this,conn_peer,true where logger = _logger))
         _conn.unmute()
 
+    be connect_socks5_to_probe(node: Node tag,route_id: USize,socks_request: Array[U8] iso) =>
+        _logger(Info) and _logger.log("called connect_socks5_to_probe")
+        _nodes    = [node]
+        _route_id = route_id
+        _request  = consume socks_request
+        node.provide_connection_to_you(this,_conn,route_id)
+
     fun ref try_next_node() =>
         try
             let node = _nodes(_node_i)?
