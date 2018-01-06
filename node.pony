@@ -145,7 +145,7 @@ actor Node
         _routes.push(consume ri)
 
     be provide_connection_to_you(dialer: Dialer,conn: TCPConnection) =>
-        _logger(Info) and _logger.log("Provide connection to "+_name)
+        _logger(Fine) and _logger.log("Provide connection to "+_name)
         connection_count = connection_count + 1
         let route_id = connection_count % _routes.size()
         try
@@ -187,6 +187,8 @@ actor Node
             ri.nr_roundtrips = ri.nr_roundtrips+1
             ri.sum_roundtrip_ms = ri.sum_roundtrip_ms + data_roundtrip_ms
         end
+
+    be connection_closed(route_id: USize,tx_bytes: USize,rx_bytes: USize) =>
         show_route_info(route_id)
 
     fun ref show_route_info(route_id: USize) =>
@@ -194,23 +196,26 @@ actor Node
             try
                 let out = recover iso String(100) end
                 let ri = _routes(route_id)?
-                out.append("Down=#")
+                out.append(_name)
+                out.append("-")
+                out.append(route_id.string())
+                out.append("=> Down=#")
                 out.append(ri.down_count.string())
-                out.append("   Roundtrips=#")
+                out.append(" Rounds=#")
                 out.append(ri.nr_roundtrips.string())
                 out.append(": ")
                 out.append((F32.from[U64](ri.sum_roundtrip_ms)
                             /F32.from[U32](ri.nr_roundtrips)).string())
                 out.append("ms, ")
-                out.append("Connections=#")
+                out.append("Conns=#")
                 out.append(ri.nr_connections.string())
-                out.append(": connect=")
+                out.append(": conn=")
                 out.append((F32.from[U64](ri.sum_connection_ms)
                             /F32.from[U32](ri.nr_connections)).string())
                 out.append("ms, auth=")
                 out.append((F32.from[U64](ri.sum_auth_ms)
                             /F32.from[U32](ri.nr_connections)).string())
-                out.append("ms, established=")
+                out.append("ms, estd=")
                 out.append((F32.from[U64](ri.sum_establish_ms)
                             /F32.from[U32](ri.nr_connections)).string())
                 out.append("ms")

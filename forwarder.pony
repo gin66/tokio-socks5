@@ -71,7 +71,7 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
             conn: TCPConnection ref,
             data: (String val | Array[U8] val))
             : (String val | Array[U8 val] val) =>
-        _logger(Info) and _logger.log("Sent " + data.size().string() + " Bytes")
+        _logger(Fine) and _logger.log("Sent " + data.size().string() + " Bytes")
         _tx_bytes = _tx_bytes + data.size()
         if (_first_received_ms == 0) and (_last_sent_ms != 0) then
             _first_received_ms = Time.millis()
@@ -90,3 +90,4 @@ class DirectForwardTCPConnectionNotify is TCPConnectionNotify
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()
+        _dialer.connection_closed(_tx_bytes,_rx_bytes)

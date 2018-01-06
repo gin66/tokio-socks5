@@ -152,3 +152,9 @@ actor Dialer
             let node = _nodes(_node_i)?
             node.record_failed_connection(_route_id)
         end
+
+    be connection_closed(tx_bytes: USize,rx_bytes: USize) =>
+        try 
+            let node = _nodes(_node_i)?
+            node.connection_closed(_route_id,tx_bytes,rx_bytes)
+        end
