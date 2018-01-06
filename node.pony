@@ -170,6 +170,11 @@ actor Node
             end
         end
 
+    be connect_socks5_to_probe(dialer:Dialer, route_id: USize) =>
+        _logger(Info) and _logger.log("Provide probe connection to "+_probe)
+        let socks_request = Socks5.make_request(_probe)
+        //dialer.connect_socks5_to_probe(this,route_id,consume socks_request)
+
     be record_failed_connection(route_id:USize) =>
         try
             let ri = _routes(route_id)?
