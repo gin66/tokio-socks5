@@ -29,6 +29,11 @@ actor Network
             _logger(Fine) and _logger.log("Cannot find node " + to_id.string() + " for " + consume addr)
         end
 
+    be inform_nodes_for_proxy(host: String,port:String) =>
+        for (country,node) in _nodes.values() do
+            node.set_proxy(host,port)
+        end
+
     be display() =>
         for (country,node) in _nodes.values() do
             node.display()

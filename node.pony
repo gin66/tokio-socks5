@@ -14,8 +14,8 @@ class RouteInfo
     var sum_connection_ms: U64  = 0
     var sum_auth_ms:       U64  = 0
     var sum_establish_ms:  U64  = 0
-    var nr_roundtrips:    U32  = 0
-    var sum_roundtrip_ms: U64  = 0
+    var nr_roundtrips:     U32  = 0
+    var sum_roundtrip_ms:  U64  = 0
     var down:              Bool = false
     var down_count:        U32  = 0
 
@@ -85,7 +85,9 @@ actor Node
     let _logger:  Logger[String]
     // This node is reachable via client accessible socks proxy
     let _routes: Array[RouteInfo ref] = Array[RouteInfo ref]
-    var connection_count: USize = 0
+    var _connection_count: USize = 0
+    var _proxy_host: String = ""
+    var _proxy_port: String = ""
 
     new create(network: Network,
                auth: AmbientAuth,
@@ -109,7 +111,6 @@ actor Node
         _country = country
         _probe = probe
         _logger  = logger
-
         _logger(Info) and _logger.log("Create node: " + _name + " with id " + _id.string())
 
     be display() =>
@@ -151,12 +152,20 @@ actor Node
         let ri = recover iso RouteInfo(consume conn,consume ia) end
         _routes.push(consume ri)
 
+    be set_proxy(host: String,port:String) =>
+        _proxy_host = host
+        _proxy_port = port
+
     be provide_connection_to_you(dialer: Dialer,conn: TCPConnection,
-                                 route_id: USize = -1) =>
+                                 rid: USize = -1) =>
         _logger(Fine) and _logger.log("Provide connection to "+_name)
-        connection_count = connection_count + 1
-        let route_id = connection_count % _routes.size()
         try
+            _connection_count = _connection_count + 1
+            let route_id = (if rid == -1 then
+                                _connection_count % _routes.size()
+                            else
+                                rid
+                            end)
             let route = _routes(route_id)?
             match route.connection
             | SocksConnection =>
@@ -203,6 +212,20 @@ actor Node
 
     be connection_closed(route_id: USize,tx_bytes: USize,rx_bytes: USize) =>
         show_route_info(route_id)
+
+        if _connection_count == 1 then
+            try
+                if _routes(route_id)?.connection is SocksConnection then
+                    TCPConnection(_auth,
+                        Socks5ProbeTCPConnectionNotify(_probe,
+                                    _id,route_id,_logger),
+                        _proxy_host,
+                        _proxy_port
+                        where init_size=16384,max_size = 16384)
+                    None
+                end
+            end
+        end
 
     fun ref show_route_info(route_id: USize) =>
         if _logger(Info) then

@@ -99,9 +99,8 @@ class SocksTCPConnectionNotify is TCPConnectionNotify
                     let ip  = (data(4)?,data(5)?,data(6)?,data(7)?)
                     addr = InetAddrPort(ip,port)
                 | Socks5.atyp_domain() => 
-                    let astr_len = USize.from[U8](data(4)?)
-                    atyp_len = astr_len + 1
-                    var dest : String iso = recover iso String end
+                    atyp_len = USize.from[U8](data(4)?)+1
+                    var dest : String iso = recover iso String(atyp_len) end
                     for i in Range(0,atyp_len-1) do
                         dest.push(data(5+i)?)
                     end
@@ -263,3 +262,68 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()
+
+    
+class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
+    var _state:    Socks5ClientState
+    let _host:     String
+    let _logger:   Logger[String]
+
+    new iso create(probe_host:String,host_id:U8,route_id:USize,
+                        logger: Logger[String]) =>
+        _state    = Socks5WaitConnect
+        _host     = probe_host
+        _logger   = logger
+
+
+    fun ref connect_failed(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Probe connection to socks proxy failed")
+
+    fun ref connected(conn: TCPConnection ref) =>
+        _logger(Info) and _logger.log("Probe connection to socks proxy succeeded")
+        _state  = Socks5WaitMethodSelection
+        conn.write([Socks5.version();1;Socks5.meth_no_auth()])
+
+    fun ref received(
+            conn: TCPConnection ref,
+            data: Array[U8] iso,
+            times: USize)
+            : Bool =>
+        _logger(Info) and _logger.log("Received " + data.size().string() + " Bytes")
+        match _state
+        | Socks5WaitMethodSelection =>
+            try
+                if data.size() != 2 then error end
+                if data(0)? != Socks5.version() then error end
+                if data(1)? != Socks5.meth_no_auth() then error end
+                _logger(Info) and _logger.log("Reply from socks proxy OK")
+                _state = Socks5WaitReply
+                let msg = recover Socks5.make_request(_host) end
+                conn.write(consume msg)
+                return false
+            end
+        | Socks5WaitReply =>
+            try
+                _logger(Info) and _logger.log("Reply from socks proxy received")
+                if data(0)? != Socks5.version() then error end
+                if data(1)? != Socks5.reply_ok() then error end
+                _state = Socks5PassThrough
+                _logger(Info) and _logger.log("Send http GET request")
+                let msg = recover 
+                        "GET /robots.txt HTTP/1.1\r\nHost: " 
+                          + _host 
+                          + "\r\nUser-Agent: none\r\nAccept: */*\r\n\r\n"
+                    end
+                conn.write(consume msg)
+                return false
+            end
+        | Socks5PassThrough =>
+            _logger(Info) and _logger.log("Reply:\n")
+            _logger.log(String.from_array(consume data))
+            return false
+        end
+        conn.dispose()
+        false
+
+    fun ref closed(conn: TCPConnection ref) =>
+        _logger(Fine) and _logger.log("Proxy connection closed")

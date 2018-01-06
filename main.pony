@@ -86,9 +86,10 @@ actor Main
                 | "Socks5Address" =>
                     let ia = InetAddrPort.create_from_host_port(value)?
                     TCPListener(auth,
-                      recover SocksTCPListenNotify(auth, chooser,logger) end, 
-                      ia.host_str(), ia.port_str() 
-                      where init_size=16384,max_size = 16384)
+                        SocksTCPListenNotify(auth, chooser,logger), 
+                        ia.host_str(), ia.port_str() 
+                        where init_size=16384,max_size = 16384)
+                    network.inform_nodes_for_proxy(ia.host_str(),ia.port_str())
                 | "Country" =>
                     country = value
                     node.set_country(country)
