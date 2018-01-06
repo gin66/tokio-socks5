@@ -1,5 +1,7 @@
 use "net"
+use "time"
 use "logger"
+use "collections"
 
 primitive DirectConnection
 primitive SocksConnection
@@ -18,6 +20,9 @@ class RouteInfo
     var sum_roundtrip_ms:  U64  = 0
     var down:              Bool = false
     var down_count:        U32  = 0
+    var total_tx_count:    USize= 0
+    var total_rx_count:    USize= 0
+    var last_connection_ms:U64  = 0
 
     new trn create(connection': Connection, socks': (None|InetAddrPort iso) = None) =>
         connection = connection'
@@ -183,7 +188,7 @@ actor Node
     be connect_socks5_to_probe(dialer:Dialer, route_id: USize) =>
         _logger(Info) and _logger.log("Provide probe connection to "+_probe)
         let socks_request = Socks5.make_request(_probe)
-        //dialer.connect_socks5_to_probe(this,route_id,consume socks_request)
+        dialer.connect_socks5_to_probe(this,route_id,consume socks_request)
 
     be record_failed_connection(route_id:USize) =>
         try
@@ -212,19 +217,11 @@ actor Node
 
     be connection_closed(route_id: USize,tx_bytes: USize,rx_bytes: USize) =>
         show_route_info(route_id)
-
-        if _connection_count == 1 then
-            try
-                if _routes(route_id)?.connection is SocksConnection then
-                    TCPConnection(_auth,
-                        Socks5ProbeTCPConnectionNotify(_probe,
-                                    _id,route_id,_logger),
-                        _proxy_host,
-                        _proxy_port
-                        where init_size=16384,max_size = 16384)
-                    None
-                end
-            end
+        try
+            let ri = _routes(route_id)?
+            ri.last_connection_ms = Time.millis()
+            ri.total_tx_count = ri.total_tx_count + tx_bytes
+            ri.total_tx_count = ri.total_tx_count + tx_bytes
         end
 
     fun ref show_route_info(route_id: USize) =>
@@ -256,5 +253,23 @@ actor Node
                             /F32.from[U32](ri.nr_connections)).string())
                 out.append("ms")
                 _logger.log(consume out)
+            end
+        end
+
+    be timer_event_1minute() =>
+        _logger(Info) and _logger.log("Minute Event")
+        for route_id in Range(0,_routes.size()) do
+            show_route_info(route_id)
+
+            try
+                if _routes(route_id)?.connection is SocksConnection then
+                    TCPConnection(_auth,
+                        Socks5ProbeTCPConnectionNotify(_probe,
+                                    _id,route_id,_logger),
+                        _proxy_host,
+                        _proxy_port
+                        where init_size=16384,max_size = 16384)
+                    None
+                end
             end
         end
