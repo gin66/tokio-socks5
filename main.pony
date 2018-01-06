@@ -92,6 +92,8 @@ actor Main
                 | "Country" =>
                     country = value
                     node.set_country(country)
+                | "Probe" =>
+                    node.set_probe(value)
                 | "SocksProxy" =>
                     if self then
                       let to_id = composite(1)?.u8()?

@@ -35,6 +35,7 @@ class NodeBuilder
     let _id: U8
     let _self: Bool
     var _name: String iso
+    var _probe: String = ""
     var _country: String = "ZZ"
     var _udp_addresses: Array[InetAddrPort ref] iso = recover Array[InetAddrPort ref] end
     var _tcp_addresses: Array[InetAddrPort ref] iso = recover Array[InetAddrPort ref] end
@@ -58,11 +59,14 @@ class NodeBuilder
     fun ref set_country(country: String) =>
         _country = country
 
+    fun ref set_probe(probe: String) =>
+        _probe = probe
+
     fun ref build() : Node tag =>
         let n = _name = recover "".string() end
         let t = _tcp_addresses = recover Array[InetAddrPort ref] end
         let u = _udp_addresses = recover Array[InetAddrPort ref] end
-        Node(_network, _auth, _ipdb,_logger, _id, _self, consume n, consume t, consume u, _country)
+        Node(_network, _auth, _ipdb, _id, _self, consume n, consume t, consume u, _country, _probe, _logger)
 
 actor Node
     """
@@ -71,13 +75,14 @@ actor Node
     let _network: Network
     let _auth:    AmbientAuth val
     let _ipdb:    IpDB tag
-    let _logger:  Logger[String]
     let _id: U8
     let _self: Bool
     let _name: String
     let _static_udp : Array[InetAddrPort ref]
     let _static_tcp : Array[InetAddrPort ref]
     var _country: String = "ZZ"
+    let _probe: String
+    let _logger:  Logger[String]
     // This node is reachable via client accessible socks proxy
     let _routes: Array[RouteInfo ref] = Array[RouteInfo ref]
     var connection_count: USize = 0
@@ -85,23 +90,25 @@ actor Node
     new create(network: Network,
                auth: AmbientAuth,
                ipdb: IpDB tag,
-               logger: Logger[String],
                id: U8,
                self: Bool,
                name: String iso,
                static_tcp: Array[InetAddrPort ref] iso,
                static_udp: Array[InetAddrPort ref] iso,
-               country: String) =>
+               country: String,
+               probe: String,
+               logger: Logger[String]) =>
         _network = network
         _auth    = auth
         _ipdb    = ipdb
-        _logger  = logger
         _id   = id
         _self = self
         _name = consume name
         _static_tcp = consume static_tcp
         _static_udp = consume static_udp
         _country = country
+        _probe = probe
+        _logger  = logger
 
         _logger(Info) and _logger.log("Create node: " + _name + " with id " + _id.string())
 
