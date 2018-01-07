@@ -244,11 +244,11 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
         | Socks5WaitReply =>
             try
                 _logger(Fine) and _logger.log("Reply from socks proxy received")
-                if data(0)? != Socks5.version() then error end
-                if data(1)? != Socks5.reply_ok() then error end
-                let delta_ms = Time.millis() - _start_ms
-                _dialer.outgoing_socks_connection_established(_route_id,_conn_ms,
-                                                                        _auth_ms,delta_ms)
+                if (data(0)? == Socks5.version()) and (data(1)? == Socks5.reply_ok()) then
+                    let delta_ms = Time.millis() - _start_ms
+                    _dialer.outgoing_socks_connection_established(_route_id,_conn_ms,
+                                                                            _auth_ms,delta_ms)
+                end
                 _state = Socks5PassThrough
                 _peer.write(consume data)
                 return false
@@ -277,6 +277,9 @@ class Socks5OutgoingTCPConnectionNotify is TCPConnectionNotify
     fun ref closed(conn: TCPConnection ref) =>
         _logger(Fine) and _logger.log("Connection closed tx/rx=" + _tx_bytes.string() + "/" + _rx_bytes.string())
         _peer.dispose()
+        if not(_state is Socks5PassThrough) then
+            _dialer.outgoing_socks_connection_failed(_route_id,conn)
+        end
 
     
 class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
@@ -337,7 +340,7 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
                 return false
             end
         | Socks5PassThrough =>
-            _logger(Info) and _logger.log("Received reply:" + data.size().string())
+            _logger(Fine) and _logger.log("Received reply:" + data.size().string())
             //_logger.log(String.from_array(consume data))
             //return false .... fall through and close connection
         end
