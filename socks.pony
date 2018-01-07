@@ -298,10 +298,10 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
         _logger   = logger
 
     fun ref connect_failed(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Probe connection to socks proxy failed")
+        _logger(Fine) and _logger.log("Probe connection to socks proxy failed")
 
     fun ref connected(conn: TCPConnection ref) =>
-        _logger(Info) and _logger.log("Probe connection to socks proxy succeeded")
+        _logger(Fine) and _logger.log("Probe connection to socks proxy succeeded")
         _state  = Socks5WaitMethodSelection
         conn.write([Socks5.version();1;Socks5.meth_no_auth()])
 
@@ -317,7 +317,7 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
                 if data.size() != 2 then error end
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.meth_no_auth() then error end
-                _logger(Info) and _logger.log("Reply from socks proxy OK")
+                _logger(Fine) and _logger.log("Reply from socks proxy OK")
                 _state = Socks5WaitReply
                 let ip: (U8,U8,U8,U8) = (0,0,_host_id,_route_id)
                 let msg = recover Socks5.make_request_ipv4(ip) end
@@ -326,11 +326,11 @@ class Socks5ProbeTCPConnectionNotify is TCPConnectionNotify
             end
         | Socks5WaitReply =>
             try
-                _logger(Info) and _logger.log("Reply from socks proxy received")
+                _logger(Fine) and _logger.log("Reply from socks proxy received")
                 if data(0)? != Socks5.version() then error end
                 if data(1)? != Socks5.reply_ok() then error end
                 _state = Socks5PassThrough
-                _logger(Info) and _logger.log("Send http GET request")
+                _logger(Fine) and _logger.log("Send http GET request")
                 let msg = recover 
                         "GET /robots.txt HTTP/1.1\r\nHost: " 
                           + _host 
