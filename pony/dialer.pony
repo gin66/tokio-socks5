@@ -96,7 +96,7 @@ actor Dialer
         _conn.unmute()
 
     be connect_socks5_to_probe(node: Node tag,route_id: USize,socks_request: Array[U8] iso) =>
-        _logger(Info) and _logger.log("called connect_socks5_to_probe")
+        _logger(Fine) and _logger.log("called connect_socks5_to_probe")
         _nodes    = [node]
         _route_id = route_id
         _request  = consume socks_request
