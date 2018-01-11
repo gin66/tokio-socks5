@@ -54,3 +54,4 @@ class Server is TCPConnectionNotify
 
   fun ref connect_failed(conn: TCPConnection ref) =>
     _out.print("connect failed")
+
