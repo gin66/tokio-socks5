@@ -5,9 +5,8 @@
 It shall be: A multi-server and multi-client vpn to internet showing up as socks5-proxy on client side
 
 The tokio-socks5 project has been used as a starter for the implementation.
-After having time have been wasted to figure out, how to implement this application with futures,
-finally this has been given. Instead of rust now the language pony is in use. This actor system
-is much more understandable and high performance is expected for this implementation 
+
+In the meantime an experimental implementation has started using the language pony as an alternative to rust.  The resulting application has demonstrated a surprising high CPU load in near idle situations.  Investigation has revealed, that this is caused by pony's runtime overhead.  A quite successful improvement idea to reduce the CPU load has been rejected by SeanTAllen (creator of pony) due to his judgement about the (unconfirmed) performance impact onto highly concurrent and highly loaded servers. Thus it can be predicted, that future design decisions of pony will not improve this situation. Due to this, the use has been abandoned as being a deadend for an application to be used on a laptop.
 
 [![Build Status](https://travis-ci.org/gin66/uservpn-socks5.svg?branch=mba)](https://travis-ci.org/gin66/uservpn-socks5)
 
@@ -26,6 +25,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 
 ## Requirements
 
+- [ ] R.. Low CPU usage in order for use on battery driven computers like laptops
 - [ ] R.. Connected nodes form a uservpn
 - [X] R.. Nodes are uniquely numbered (range 1-254)
 - [X] R.. Nodes with socks5-proxy enabled are typically clients
@@ -60,7 +60,7 @@ The first four make use of a tun- or tap-device. Thus root is needed on client a
 - [ ] R...Support node to node protocol: KCP ?
 - [ ] R.. Messages allow flight time to be measured
 - [ ] R.. Two Nodes aka Server-Client together implement socks5-proxy
-- [ ] R.. Language should be pony (for performance reasons) - not python
+- [ ] R.. Language should be rust (for performance reasons) - not python
 - [ ] R.. Portion of traffic from client to server will be always sent via other nodes
 - [ ] R.. Autoupdate of all nodes triggered by node informing about latest SW
 - [ ] R.. SW distribution via github
