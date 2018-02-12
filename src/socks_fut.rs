@@ -58,7 +58,7 @@ impl Future for SocksHandshake {
     type Item = TcpStream;
     type Error = io::Error;
 
-    fn poll(&mut self) -> Result<Async<TcpStream>, io::Error> {
+    fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
         use self::State::*;
 
         loop {
