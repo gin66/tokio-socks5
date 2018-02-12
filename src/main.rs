@@ -1,6 +1,7 @@
 #[macro_use]
 extern crate log;
 extern crate env_logger;
+#[macro_use]
 extern crate futures;
 #[macro_use]
 extern crate tokio_core;
@@ -9,6 +10,8 @@ extern crate tokio_timer;
 extern crate trust_dns;
 #[macro_use]
 extern crate clap;
+extern crate ini;
+extern crate bytes;
 
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
@@ -30,8 +33,15 @@ use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
 use trust_dns::client::ClientFuture;
 use trust_dns::udp::UdpClientStream;
+use ini::Ini;
+
+mod message;
+mod socks;
+mod socks_fut;
+mod resolver;
 
 use socks::SocksClient;
+use socks_fut::{SocksHandshake,socks_handshake};
 
 //
 // The following streams/futures are executed:
@@ -46,12 +56,16 @@ use socks::SocksClient;
 // 2.) For each client connection a TCP sender
 //     It pulls the next message to be sent.    
 
-mod message;
-mod socks;
-mod resolver;
-
 fn main() {
     drop(env_logger::init());
+
+    let i = Ini::load_from_file("config.ini").unwrap();
+    for (sec, prop) in i.iter() {
+        println!("Section: {:?}", *sec);
+        for (k, v) in prop.iter() {
+            println!("{}:{}", *k, *v);
+        }
+    }
 
     let matches = clap_app!(uservpn_socks5 =>
         (version: crate_version!())
@@ -114,22 +128,24 @@ fn main() {
 
     let resolver = resolver::start(handle.clone());
 
-    let resolve_test = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                  Duration::new(1,0),&handle).unwrap()
-                        .then(move |_| {
-                            println!("Call query for_each");
-                            let rx = resolver.clone();
-                            rx.query("127.0.0.1:8080".to_string())
-                        })
-                        .and_then( |ans| {
-                            println!("got answer {:?}",ans);
-                            Ok(())
-                        })
-                        .for_each(|_| {
-                            Ok(())
-                        })
-                        .then( |_| { Ok(())});
-    handle.spawn(resolve_test);
+    if false {
+        let resolve_test = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                    Duration::new(1,0),&handle).unwrap()
+                            .then(move |_| {
+                                println!("Call query for_each");
+                                let rx = resolver.clone();
+                                rx.query("127.0.0.1:8080".to_string())
+                            })
+                            .and_then( |ans| {
+                                println!("got answer {:?}",ans);
+                                Ok(())
+                            })
+                            .for_each(|_| {
+                                Ok(())
+                            })
+                            .then( |_| { Ok(())});
+        handle.spawn(resolve_test);
+    }
 
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
@@ -174,41 +190,45 @@ fn main() {
     //      3. If peer is not connected, initiate sending Hello message
     //
     // initiator helds a future to be waited for
-    let peer_list2 = peer_list.clone();
-    let tx2 = tx.clone();
-    let handle2 = handle.clone();
-    let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                  Duration::new(10,0),&handle).unwrap()
-                        .for_each(move |_| {
-                            for ad in &peer_list2 {
-                                println!("Send Init to {}",ad);
-                                let thread_tx = tx2.clone();
-                                let buf: Vec<u8> = vec![0;10];
-                                let msg = (ad.clone(),buf);
-                                handle2.spawn(thread_tx.send(msg)
-                                                .then( |_| { Ok(())}));
-                            };
-                            Ok(())
-                        })
-                        .then( |_| { Ok(())});
-    handle.spawn(initiator);
+    if false {
+        let peer_list2 = peer_list.clone();
+        let tx2 = tx.clone();
+        let handle2 = handle.clone();
+        let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                    Duration::new(10,0),&handle).unwrap()
+                            .for_each(move |_| {
+                                for ad in &peer_list2 {
+                                    println!("Send Init to {}",ad);
+                                    let thread_tx = tx2.clone();
+                                    let buf: Vec<u8> = vec![0;10];
+                                    let msg = (ad.clone(),buf);
+                                    handle2.spawn(thread_tx.send(msg)
+                                                    .then( |_| { Ok(())}));
+                                };
+                                Ok(())
+                            })
+                            .then( |_| { Ok(())});
+        handle.spawn(initiator);
+    }
 
-    let handle2 = handle.clone();
-    let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                  Duration::new(1,0),&handle).unwrap()
-                        .for_each(move |_| {
-                            for ad in &peer_list {
-                                println!("Send Data to {}",ad);
-                                let thread_tx = tx.clone();
-                                let buf: Vec<u8> = vec![0;10];
-                                let msg = (ad.clone(),buf);
-                                handle2.spawn(thread_tx.send(msg)
-                                                .then( |_| { Ok(())}));
-                            };
-                            Ok(())
-                        })
-                        .then( |_| { Ok(())});
-    handle.spawn(communicator);
+    if false {
+        let handle2 = handle.clone();
+        let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                    Duration::new(1,0),&handle).unwrap()
+                            .for_each(move |_| {
+                                for ad in &peer_list {
+                                    println!("Send Data to {}",ad);
+                                    let thread_tx = tx.clone();
+                                    let buf: Vec<u8> = vec![0;10];
+                                    let msg = (ad.clone(),buf);
+                                    handle2.spawn(thread_tx.send(msg)
+                                                    .then( |_| { Ok(())}));
+                                };
+                                Ok(())
+                            })
+                            .then( |_| { Ok(())});
+        handle.spawn(communicator);
+    }
 
     // This is the address of the DNS server we'll send queries to. If
     // external servers can't be used in your environment, you can substitue
@@ -227,26 +247,38 @@ fn main() {
     // itself is then *spawned* onto the event loop to ensure that it can
     // progress concurrently with all other connections.
     println!("Listening for socks5 proxy connections on {}", addr);
-    let clients = listener.incoming().map(move |(socket, addr)| {
-        (SocksClient {
-            buffer: buffer.clone(),
-            dns: client.clone(),
-            handle: handle.clone(),
-        }.serve(socket), addr)
-    });
     let handle = lp.handle();
-    let server = clients.for_each(|(client, addr)| {
-        handle.spawn(client.then(move |res| {
-            match res {
-                Ok((a, b)) => {
-                    println!("proxied {}/{} bytes for {}", a, b, addr)
-                }
-                Err(e) => println!("error for {}: {}", addr, e),
-            }
-            future::ok(())
-        }));
+    let server = listener.incoming().for_each(|(socket, addr)| {
+        handle.spawn(
+            socks_fut::socks_handshake(socket)
+                //.then(|_| {future::ok(())})
+                .then( |res| { 
+                    match res {
+                        Ok(_) => (),
+                        Err(e) => println!("{}", e)
+                    }
+                    Ok(())
+                })
+        );
         Ok(())
     });
+    //let server = listener.incoming().for_each(|(socket, addr)| {
+    //    let client = SocksClient {
+    //                    buffer: buffer.clone(),
+    //                    dns: client.clone(),
+    //                    handle: handle.clone(),
+    //                }.serve(socket);
+    //    handle.spawn(client.then(move |res| {
+    //        match res {
+    //            Ok((a, b)) => {
+    //                println!("proxied {}/{} bytes for {}", a, b, addr)
+    //            }
+    //            Err(e) => println!("error for {}: {}", addr, e),
+    //        }
+    //        future::ok(())
+    //    }));
+    //    Ok(())
+    //});
 
     // Now that we've got our server as a future ready to go, let's run it!
     //
