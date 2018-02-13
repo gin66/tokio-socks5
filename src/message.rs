@@ -5,6 +5,7 @@ use tokio_core::net::UdpCodec;
 
 // The message header is watermarked and as such should be of length n*128 bits aka 16 Bytes
 // and n >= 3.
+#[allow(dead_code)]
 pub struct MessageInfo { // Can be placed after payload with few separating waste bytes
 	// first 128 bit block
 	pub magic: [u8; 8],

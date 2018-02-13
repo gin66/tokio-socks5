@@ -3,7 +3,7 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate futures;
-#[macro_use]
+//#[macro_use]
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_timer;
@@ -24,7 +24,7 @@ use std::rc::Rc;
 use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
 
-use futures::{future,Future, Stream, Sink};
+use futures::{Future, Stream, Sink};
 use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
@@ -36,12 +36,8 @@ use trust_dns::udp::UdpClientStream;
 use ini::Ini;
 
 mod message;
-mod socks;
 mod socks_fut;
 mod resolver;
-
-use socks::SocksClient;
-use socks_fut::{SocksHandshake,socks_handshake};
 
 //
 // The following streams/futures are executed:

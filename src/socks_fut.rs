@@ -32,7 +32,7 @@ mod v5 {
 }
 
 enum ServerState {
-    // as per RFC 1928, first read into buffer
+    // as per RFC 1928
     WaitClientAuthentication(ReadExact<TcpStream,Vec<u8>>),
     ReadAuthenticationMethods(ReadExact<TcpStream,Vec<u8>>),
     AnswerNoAuthentication(WriteAll<TcpStream,Vec<u8>>),
