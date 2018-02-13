@@ -16,9 +16,8 @@ extern crate bytes;
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
 //use std::net::{Shutdown, IpAddr};
-use std::net::{SocketAddr, IpAddr, Ipv4Addr, SocketAddrV4};
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 //use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
-use std::rc::Rc;
 //use std::sync::{Arc,Mutex};
 //use std::str;
 use std::time::{Instant,Duration};
@@ -106,7 +105,7 @@ fn main() {
     // Here we create the event loop, the global buffer that all threads will
     // read/write into, and the bound TCP listener itself.
     let mut lp = Core::new().unwrap();
-    let buffer = Rc::new(RefCell::new(vec![0; 64 * 1024]));
+    //let buffer = Rc::new(RefCell::new(vec![0; 64 * 1024]));
     let handle = lp.handle();
     let listener = TcpListener::bind(&addr, &handle).unwrap();
 
@@ -248,18 +247,16 @@ fn main() {
         let handle2 = handle.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
-                .then(move |res| { 
-                    match res {
-                        Ok(_) => {
-                            let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
-                            let connecting = TcpStream::connect(&sa,&handle2);
-                            Ok(())
-                        },
-                        Err(e) => {
-                            println!("{}", e);
-                            Ok(())
-                        }
-                    }
+                .and_then(move |(source,addr,request)| { 
+                    let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
+                    let connecting = TcpStream::connect(&sa,&handle2);
+                    connecting.and_then(|dest| {
+                        socks_fut::socks_connect_handshake(dest,request)
+                    })
+                })
+                .then( |_| { 
+                    println!("both connected");
+                    Ok(())
                 })
         );
         Ok(())

@@ -81,13 +81,13 @@ pub enum Command {
 }
 
 pub enum Addr {
-    IPV4(BytesMut,Vec<u8>,u16,Command),   // last parameter is port
-    IPV6(BytesMut,Vec<u8>,u16,Command),
-    DOMAIN(BytesMut,Vec<u8>,u16,Command)
+    IPV4(Vec<u8>,u16,Command),   // last parameter is port
+    IPV6(Vec<u8>,u16,Command),
+    DOMAIN(Vec<u8>,u16,Command)
 }
 
 impl Future for SocksHandshake {
-    type Item = (TcpStream,Addr);
+    type Item = (TcpStream,Addr,BytesMut);
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
@@ -158,21 +158,21 @@ impl Future for SocksHandshake {
                         let addr = match self.request[3] {
                             v5::ATYP_IPV4   => {
                                 let ipv4 = self.request[4..8].to_vec();
-                                Addr::IPV4(self.request.take(),ipv4,port,cmd)
+                                Addr::IPV4(ipv4,port,cmd)
                             },
                             v5::ATYP_IPV6   => {
                                 let ipv6 = self.request[4..20].to_vec();
-                                Addr::IPV6(self.request.take(),ipv6,port,cmd)
+                                Addr::IPV6(ipv6,port,cmd)
                             },
                             v5::ATYP_DOMAIN => {
                                 let domlen = self.request[4] as usize;
                                 let dom: Vec<u8> = self.request[5..(5+domlen)].to_vec();
-                                Addr::DOMAIN(self.request.take(),dom,port,cmd)
+                                Addr::DOMAIN(dom,port,cmd)
                             },
                             _ =>
                                 panic!("Memory mutation happened")
                         };
-                        return Ok(Async::Ready(((stream,addr))));
+                        return Ok(Async::Ready(((stream,addr,self.request.take()))));
                     }
                 }
             }
@@ -190,7 +190,7 @@ impl Future for SocksConnectHandshake {
         loop {
             self.state = match self.state {
                 WaitSentAuthentication(ref mut fut) => {
-                    let (stream,buf) = try_ready!(fut.poll());
+                    let (stream,_buf) = try_ready!(fut.poll());
                     WaitAuthenticationMethod(
                         read_exact(stream,vec![0u8; 2])
                     )
@@ -198,14 +198,14 @@ impl Future for SocksConnectHandshake {
                 WaitAuthenticationMethod(ref mut fut) => {
                     let (stream,buf) = try_ready!(fut.poll());
                     if (buf[0] != v5::VERSION) || (buf[1] != 0) {
-                        return Err(Error::new(ErrorKind::Other, "Not Socks5 protocol"));
+                        return Err(Error::new(ErrorKind::Other, "xxxNot Socks5 protocol"));
                     }
                     WaitSentRequest(
                         write_all(stream,self.request.take().to_vec())
                     )
                 }
                 WaitSentRequest(ref mut fut) => {
-                    let (stream,buf) = try_ready!(fut.poll());
+                    let (stream,_buf) = try_ready!(fut.poll());
                     return Ok(Async::Ready((stream)));
                 }
             }
