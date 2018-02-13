@@ -129,8 +129,11 @@ impl Future for SocksHandshake {
                 WaitClientRequest(ref mut fut) => {
                     let (stream,buf) = try_ready!(fut.poll());
                     self.request.put_slice(&buf);
-                    if (self.request[0] != v5::VERSION) || (self.request[1] != 0) {
+                    if self.request[0] != v5::VERSION {
                         return Err(Error::new(ErrorKind::Other, "Not Socks5 protocol"))
+                    };
+                    if self.request[2] != 0 {
+                        return Err(Error::new(ErrorKind::Other, "Reserved is not 0"))
                     };
                     let cmd = match self.request[1] {
                         v5::CMD_CONNECT => Command::Connect,
@@ -198,7 +201,7 @@ impl Future for SocksConnectHandshake {
                 WaitAuthenticationMethod(ref mut fut) => {
                     let (stream,buf) = try_ready!(fut.poll());
                     if (buf[0] != v5::VERSION) || (buf[1] != 0) {
-                        return Err(Error::new(ErrorKind::Other, "xxxNot Socks5 protocol"));
+                        return Err(Error::new(ErrorKind::Other, "No Socks5 proxy found"));
                     }
                     WaitSentRequest(
                         write_all(stream,self.request.take().to_vec())
