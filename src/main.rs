@@ -16,7 +16,7 @@ extern crate bytes;
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
 //use std::net::{Shutdown, IpAddr};
-use std::net::SocketAddr;
+use std::net::{SocketAddr, IpAddr, Ipv4Addr, SocketAddrV4};
 //use std::net::{SocketAddr, Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
 use std::rc::Rc;
 //use std::sync::{Arc,Mutex};
@@ -29,7 +29,7 @@ use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
 //use tokio_io::io::{read_exact, write_all, Window};
-use tokio_core::net::{TcpListener, UdpSocket};
+use tokio_core::net::{TcpListener, UdpSocket, TcpStream};
 use tokio_core::reactor::{Core, Interval};
 use trust_dns::client::ClientFuture;
 use trust_dns::udp::UdpClientStream;
@@ -245,15 +245,21 @@ fn main() {
     println!("Listening for socks5 proxy connections on {}", addr);
     let handle = lp.handle();
     let server = listener.incoming().for_each(|(socket, addr)| {
+        let handle2 = handle.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
-                //.then(|_| {future::ok(())})
-                .then( |res| { 
+                .then(move |res| { 
                     match res {
-                        Ok(_) => (),
-                        Err(e) => println!("{}", e)
+                        Ok(_) => {
+                            let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
+                            let connecting = TcpStream::connect(&sa,&handle2);
+                            Ok(())
+                        },
+                        Err(e) => {
+                            println!("{}", e);
+                            Ok(())
+                        }
                     }
-                    Ok(())
                 })
         );
         Ok(())

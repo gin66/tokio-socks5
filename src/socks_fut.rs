@@ -39,9 +39,21 @@ enum ServerState {
     WaitClientRequest(ReadExact<TcpStream,Vec<u8>>),
 }
 
+enum ClientState {
+    // as per RFC 1928
+    WaitSentAuthentication(WriteAll<TcpStream,Vec<u8>>),
+    WaitAuthenticationMethod(ReadExact<TcpStream,Vec<u8>>),
+    WaitSentRequest(WriteAll<TcpStream,Vec<u8>>)
+}
+
 pub struct SocksHandshake {
     request: BytesMut,
     state: ServerState
+}
+
+pub struct SocksConnectHandshake {
+    request: BytesMut,
+    state: ClientState
 }
 
 pub fn socks_handshake(stream: TcpStream) -> SocksHandshake {
@@ -49,6 +61,15 @@ pub fn socks_handshake(stream: TcpStream) -> SocksHandshake {
         request: BytesMut::with_capacity(v5::MAX_REQUEST_SIZE),
         state: ServerState::WaitClientAuthentication(
             read_exact(stream,vec!(0u8;2))
+        )
+    }
+}
+
+pub fn socks_connect_handshake(stream: TcpStream,request: BytesMut) -> SocksConnectHandshake {
+    SocksConnectHandshake { 
+        request,
+        state: ClientState::WaitSentAuthentication(
+            write_all(stream,vec![v5::VERSION,1u8,v5::METH_NO_AUTH])
         )
     }
 }
@@ -153,6 +174,39 @@ impl Future for SocksHandshake {
                         };
                         return Ok(Async::Ready(((stream,addr))));
                     }
+                }
+            }
+        }
+    }
+}
+
+impl Future for SocksConnectHandshake {
+    type Item = (TcpStream);
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
+        use self::ClientState::*;
+
+        loop {
+            self.state = match self.state {
+                WaitSentAuthentication(ref mut fut) => {
+                    let (stream,buf) = try_ready!(fut.poll());
+                    WaitAuthenticationMethod(
+                        read_exact(stream,vec![0u8; 2])
+                    )
+                }
+                WaitAuthenticationMethod(ref mut fut) => {
+                    let (stream,buf) = try_ready!(fut.poll());
+                    if (buf[0] != v5::VERSION) || (buf[1] != 0) {
+                        return Err(Error::new(ErrorKind::Other, "Not Socks5 protocol"));
+                    }
+                    WaitSentRequest(
+                        write_all(stream,self.request.take().to_vec())
+                    )
+                }
+                WaitSentRequest(ref mut fut) => {
+                    let (stream,buf) = try_ready!(fut.poll());
+                    return Ok(Async::Ready((stream)));
                 }
             }
         }
