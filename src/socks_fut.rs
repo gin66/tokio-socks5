@@ -8,13 +8,13 @@ use futures::Async;
 use bytes::BytesMut;
 use bytes::BufMut;
 
-#[allow(dead_code)]
 mod v5 {
+    // as per RFC 1928
     pub const VERSION: u8 = 5;
 
     pub const METH_NO_AUTH: u8 = 0;
-    pub const METH_GSSAPI: u8 = 1;
-    pub const METH_USER_PASS: u8 = 2;
+    //pub const METH_GSSAPI: u8 = 1;
+    //pub const METH_USER_PASS: u8 = 2;
     pub const METH_NO_ACCEPTABLE_METHOD: u8 = 255;
 
     pub const CMD_CONNECT: u8 = 1;
@@ -32,7 +32,6 @@ mod v5 {
 }
 
 enum ServerState {
-    // as per RFC 1928
     WaitClientAuthentication(ReadExact<TcpStream,Vec<u8>>),
     ReadAuthenticationMethods(ReadExact<TcpStream,Vec<u8>>),
     AnswerNoAuthentication(WriteAll<TcpStream,Vec<u8>>),
@@ -40,7 +39,6 @@ enum ServerState {
 }
 
 enum ClientState {
-    // as per RFC 1928
     WaitSentAuthentication(WriteAll<TcpStream,Vec<u8>>),
     WaitAuthenticationMethod(ReadExact<TcpStream,Vec<u8>>),
     WaitSentRequest(WriteAll<TcpStream,Vec<u8>>)
@@ -81,13 +79,13 @@ pub enum Command {
 }
 
 pub enum Addr {
-    IPV4(Vec<u8>,u16,Command),   // last parameter is port
-    IPV6(Vec<u8>,u16,Command),
-    DOMAIN(Vec<u8>,u16,Command)
+    IPV4(Vec<u8>),
+    IPV6(Vec<u8>),
+    DOMAIN(Vec<u8>)
 }
 
 impl Future for SocksHandshake {
-    type Item = (TcpStream,Addr,BytesMut);
+    type Item = (TcpStream,Addr,BytesMut,u16,Command);
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
@@ -130,16 +128,17 @@ impl Future for SocksHandshake {
                     let (stream,buf) = try_ready!(fut.poll());
                     self.request.put_slice(&buf);
                     if self.request[0] != v5::VERSION {
-                        return Err(Error::new(ErrorKind::Other, "Not Socks5 protocol"))
+                        return Err(Error::new(ErrorKind::Other, "Not Socks5 request"))
                     };
                     if self.request[2] != 0 {
-                        return Err(Error::new(ErrorKind::Other, "Reserved is not 0"))
+                        return Err(Error::new(ErrorKind::Other, 
+                                "Reserved field in socks5 request is not 0x00"))
                     };
                     let cmd = match self.request[1] {
                         v5::CMD_CONNECT => Command::Connect,
                         v5::CMD_BIND    => Command::Bind,
                         v5::CMD_UDP_ASSOCIATE => Command::UdpAssociate,
-                        _ => return Err(Error::new(ErrorKind::Other, "Unknown socks command"))
+                        _ => return Err(Error::new(ErrorKind::Other, "Unknown socks5 command"))
                     };
                     let dst_len =
                         match self.request[3] {
@@ -147,7 +146,7 @@ impl Future for SocksHandshake {
                             v5::ATYP_IPV6   => 16,
                             v5::ATYP_DOMAIN => self.request[4]+1,
                             _ => return Err(Error::new(ErrorKind::Other, 
-                                                        "Unknown address typ"))
+                                                "Unknown address typ in socks5 request"))
                         };
                     let delta = (dst_len as usize) + 6 - self.request.len();
                     if delta > 0 {
@@ -161,21 +160,22 @@ impl Future for SocksHandshake {
                         let addr = match self.request[3] {
                             v5::ATYP_IPV4   => {
                                 let ipv4 = self.request[4..8].to_vec();
-                                Addr::IPV4(ipv4,port,cmd)
+                                Addr::IPV4(ipv4)
                             },
                             v5::ATYP_IPV6   => {
                                 let ipv6 = self.request[4..20].to_vec();
-                                Addr::IPV6(ipv6,port,cmd)
+                                Addr::IPV6(ipv6)
                             },
                             v5::ATYP_DOMAIN => {
                                 let domlen = self.request[4] as usize;
                                 let dom: Vec<u8> = self.request[5..(5+domlen)].to_vec();
-                                Addr::DOMAIN(dom,port,cmd)
+                                Addr::DOMAIN(dom)
                             },
                             _ =>
                                 panic!("Memory mutation happened")
                         };
-                        return Ok(Async::Ready(((stream,addr,self.request.take()))));
+                        return Ok(Async::Ready(((stream,addr,self.request.take(),
+                                                 port,cmd))));
                     }
                 }
             }

@@ -244,11 +244,11 @@ fn main() {
     // progress concurrently with all other connections.
     println!("Listening for socks5 proxy connections on {}", addr);
     let handle = lp.handle();
-    let server = listener.incoming().for_each(|(socket, addr)| {
+    let server = listener.incoming().for_each(|(socket, _addr)| {
         let handle2 = handle.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
-                .and_then(move |(source,_addr,request)| { 
+                .and_then(move |(source,_addr,request,_port,_cmd)| { 
                     println!("connect tcp proxy");
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
                     let connecting = TcpStream::connect(&sa,&handle2);
@@ -277,23 +277,6 @@ fn main() {
         );
         Ok(())
     });
-    //let server = listener.incoming().for_each(|(socket, addr)| {
-    //    let client = SocksClient {
-    //                    buffer: buffer.clone(),
-    //                    dns: client.clone(),
-    //                    handle: handle.clone(),
-    //                }.serve(socket);
-    //    handle.spawn(client.then(move |res| {
-    //        match res {
-    //            Ok((a, b)) => {
-    //                println!("proxied {}/{} bytes for {}", a, b, addr)
-    //            }
-    //            Err(e) => println!("error for {}: {}", addr, e),
-    //        }
-    //        future::ok(())
-    //    }));
-    //    Ok(())
-    //});
 
     // Now that we've got our server as a future ready to go, let's run it!
     //
