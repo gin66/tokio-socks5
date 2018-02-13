@@ -7,7 +7,7 @@ extern crate futures;
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_timer;
-extern crate trust_dns;
+extern crate trust_dns_resolver;
 #[macro_use]
 extern crate clap;
 extern crate ini;
@@ -30,8 +30,8 @@ use futures::stream::{SplitSink,SplitStream};
 //use tokio_io::io::{read_exact, write_all, Window};
 use tokio_core::net::{TcpListener, UdpSocket, TcpStream};
 use tokio_core::reactor::{Core, Interval};
-use trust_dns::client::ClientFuture;
-use trust_dns::udp::UdpClientStream;
+use trust_dns_resolver::ResolverFuture;
+use trust_dns_resolver::config::*;
 use ini::Ini;
 
 mod message;
@@ -122,27 +122,6 @@ fn main() {
         udp_streams.push(udp_stream);
     }
 
-    let resolver = resolver::start(handle.clone());
-
-    if false {
-        let resolve_test = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                    Duration::new(1,0),&handle).unwrap()
-                            .then(move |_| {
-                                println!("Call query for_each");
-                                let rx = resolver.clone();
-                                rx.query("127.0.0.1:8080".to_string())
-                            })
-                            .and_then( |ans| {
-                                println!("got answer {:?}",ans);
-                                Ok(())
-                            })
-                            .for_each(|_| {
-                                Ok(())
-                            })
-                            .then( |_| { Ok(())});
-        handle.spawn(resolve_test);
-    }
-
     // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
     //
     // If several udp sockets are available, then use round robin for sending.
@@ -226,13 +205,6 @@ fn main() {
         handle.spawn(communicator);
     }
 
-    // This is the address of the DNS server we'll send queries to. If
-    // external servers can't be used in your environment, you can substitue
-    // your own.
-    let dns = "8.8.8.8:53".parse().unwrap();
-    let (stream, sender) = UdpClientStream::new(dns, handle.clone());
-    let client = ClientFuture::new(stream, sender, handle.clone(), None);
-
     // Construct a future representing our server. This future processes all
     // incoming connections and spawns a new task for each client which will do
     // the proxy work.
@@ -244,11 +216,18 @@ fn main() {
     // progress concurrently with all other connections.
     println!("Listening for socks5 proxy connections on {}", addr);
     let handle = lp.handle();
+    let resolver = Rc::new(ResolverFuture::new(ResolverConfig::default(),
+                                    ResolverOpts::default(), 
+                                    &handle));
     let server = listener.incoming().for_each(|(socket, _addr)| {
         let handle2 = handle.clone();
+        let resolver2 = resolver.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
-                .and_then(move |(source,_addr,request,_port,_cmd)| { 
+                .and_then(move |(source,addr,request,_port,_cmd)| {
+                    if let socks_fut::Addr::DOMAIN(host) = addr {
+                        let lookup_future = resolver2.lookup_ip("www.example.com.");
+                    };
                     println!("connect tcp proxy");
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
                     let connecting = TcpStream::connect(&sa,&handle2);
