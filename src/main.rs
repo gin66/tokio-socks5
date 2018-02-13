@@ -3,7 +3,7 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate futures;
-//#[macro_use]
+#[macro_use]
 extern crate tokio_core;
 extern crate tokio_io;
 extern crate tokio_timer;
@@ -22,7 +22,7 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 //use std::str;
 use std::time::{Instant,Duration};
 use std::io::ErrorKind::AddrNotAvailable;
-
+use std::rc::Rc;
 use futures::{Future, Stream, Sink};
 use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
@@ -35,6 +35,7 @@ use trust_dns::udp::UdpClientStream;
 use ini::Ini;
 
 mod message;
+mod transfer;
 mod socks_fut;
 mod resolver;
 
@@ -247,15 +248,30 @@ fn main() {
         let handle2 = handle.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
-                .and_then(move |(source,addr,request)| { 
+                .and_then(move |(source,_addr,request)| { 
+                    println!("connect tcp proxy");
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
                     let connecting = TcpStream::connect(&sa,&handle2);
-                    connecting.and_then(|dest| {
-                        socks_fut::socks_connect_handshake(dest,request)
-                    })
+                    connecting
+                        .and_then(|dest| {
+                            println!("connect proxy");
+                            socks_fut::socks_connect_handshake(dest,request)
+                        })
+                        .and_then(|dest|{
+                            println!("do transfer");
+                            let c1 = Rc::new(source);
+                            let c2 = Rc::new(dest);
+
+                            let half1 = transfer::Transfer::new(c1.clone(), c2.clone());
+                            let half2 = transfer::Transfer::new(c2, c1);
+                            half1.join(half2)
+                        })
                 })
-                .then( |_| { 
-                    println!("both connected");
+                .then( |res| { 
+                    match res {
+                        Ok(_)  => println!("both connected"),
+                        Err(e) => println!("{:?}",e)
+                    };
                     Ok(())
                 })
         );
