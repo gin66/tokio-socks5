@@ -31,7 +31,7 @@ mod v5 {
     pub const MAX_REQUEST_SIZE: usize = 6+1+255;
 }
 
-enum State {
+enum ServerState {
     // as per RFC 1928, first read into buffer
     WaitClientAuthentication(ReadExact<TcpStream,Vec<u8>>),
     ReadAuthenticationMethods(ReadExact<TcpStream,Vec<u8>>),
@@ -41,13 +41,13 @@ enum State {
 
 pub struct SocksHandshake {
     request: BytesMut,
-    state: State
+    state: ServerState
 }
 
 pub fn socks_handshake(stream: TcpStream) -> SocksHandshake {
     SocksHandshake { 
         request: BytesMut::with_capacity(v5::MAX_REQUEST_SIZE),
-        state: State::WaitClientAuthentication(
+        state: ServerState::WaitClientAuthentication(
             read_exact(stream,vec!(0u8;2))
         )
     }
@@ -70,7 +70,7 @@ impl Future for SocksHandshake {
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
-        use self::State::*;
+        use self::ServerState::*;
 
         loop {
             self.state = match self.state {
@@ -79,7 +79,7 @@ impl Future for SocksHandshake {
                     if (buf[0] != v5::VERSION) || (buf[1] == 0) {
                         return Err(Error::new(ErrorKind::Other, "Not Socks5 protocol"));
                     }
-                    State::ReadAuthenticationMethods(
+                    ReadAuthenticationMethods(
                         read_exact(stream,vec![0u8; buf[1] as usize])
                     )
                 }
@@ -91,7 +91,7 @@ impl Future for SocksHandshake {
                         else {
                             v5::METH_NO_ACCEPTABLE_METHOD
                         };
-                    State::AnswerNoAuthentication(
+                    AnswerNoAuthentication(
                         write_all(stream, vec![v5::VERSION, answer])
                     )
                 }
@@ -101,7 +101,7 @@ impl Future for SocksHandshake {
                         return Err(Error::new(ErrorKind::Other,
                                     "Only 'no authentication' supported"));
                     }
-                    State::WaitClientRequest(
+                    WaitClientRequest(
                         read_exact(stream,vec![0u8; v5::MIN_REQUEST_SIZE])
                     )
                 }
@@ -127,7 +127,7 @@ impl Future for SocksHandshake {
                         };
                     let delta = (dst_len as usize) + 6 - self.request.len();
                     if delta > 0 {
-                        State::WaitClientRequest(
+                        WaitClientRequest(
                             read_exact(stream,vec![0u8; delta])
                         )
                     }
