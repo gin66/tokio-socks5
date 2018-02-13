@@ -9,6 +9,7 @@
 
 use std::io;
 use std::io::{Error, ErrorKind};
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use tokio_io::io::{read_exact, write_all, ReadExact, WriteAll};
 use tokio_core::net::{TcpStream};
 use futures::*;
@@ -98,8 +99,7 @@ pub enum Command {
 }
 
 pub enum Addr {
-    IPV4(Vec<u8>),
-    IPV6(Vec<u8>),
+    IP(IpAddr),
     DOMAIN(Vec<u8>)
 }
 
@@ -178,12 +178,25 @@ impl Future for SocksHandshake {
                         let port = ((self.request[n-2] as u16) << 8) | (self.request[n-1] as u16);
                         let addr = match self.request[3] {
                             v5::ATYP_IPV4   => {
-                                let ipv4 = self.request[4..8].to_vec();
-                                Addr::IPV4(ipv4)
+                                let ipv4 = IpAddr::V4(Ipv4Addr::new(self.request[4],
+                                                                    self.request[5],
+                                                                    self.request[6],
+                                                                    self.request[7]));
+                                Addr::IP(ipv4)
                             },
                             v5::ATYP_IPV6   => {
                                 let ipv6 = self.request[4..20].to_vec();
-                                Addr::IPV6(ipv6)
+                                let ipv6 = IpAddr::V6(Ipv6Addr::new(
+                                                    ((self.request[4] as u16) <<8)+(self.request[5] as u16),
+                                                    ((self.request[6] as u16) <<8)+(self.request[7] as u16),
+                                                    ((self.request[8] as u16) <<8)+(self.request[9] as u16),
+                                                    ((self.request[10] as u16) <<8)+(self.request[11] as u16),
+                                                    ((self.request[12] as u16) <<8)+(self.request[13] as u16),
+                                                    ((self.request[14] as u16) <<8)+(self.request[15] as u16),
+                                                    ((self.request[16] as u16) <<8)+(self.request[17] as u16),
+                                                    ((self.request[18] as u16) <<8)+(self.request[19] as u16)
+                                                    ));
+                                Addr::IP(ipv6)
                             },
                             v5::ATYP_DOMAIN => {
                                 let domlen = self.request[4] as usize;
