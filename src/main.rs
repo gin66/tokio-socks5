@@ -225,8 +225,10 @@ fn main() {
         handle.spawn(
             socks_fut::socks_handshake(socket)
                 .and_then(move |(source,addr,request,_port,_cmd)| {
-                    if let socks_fut::Addr::DOMAIN(host) = addr {
-                        let lookup_future = resolver2.lookup_ip("www.example.com.");
+                    if let socks_fut::Addr::DOMAIN(mut host) = addr {
+                        host.push(b'.');
+                        let host = String::from_utf8(host).unwrap();
+                        let lookup_future = resolver2.lookup_ip(&host);
                     };
                     println!("connect tcp proxy");
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
