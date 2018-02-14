@@ -12,6 +12,7 @@ use socks_fut;
 
 enum State {
     Resolve(LookupIpFuture),
+    AnalyzeIps(Vec<IpAddr>),
     Connecting(TcpStreamNew),
     Done
 }
@@ -32,7 +33,8 @@ pub fn resolve_connect(resolver: Rc<ResolverFuture>,
             State::Resolve(resolver.lookup_ip(&host))
         },
         socks_fut::Addr::IP(ref ip) => {
-            State::Done
+            let ips = vec!(*ip);
+            State::AnalyzeIps(ips)
         }
     };
     Connecter {
@@ -41,9 +43,11 @@ pub fn resolve_connect(resolver: Rc<ResolverFuture>,
     }
 }
 
-// Here we implement the `Future` trait for `Transfer` directly. This does not
-// use any combinators, and shows how you might implement it in custom
-// situations if needed.
+// The connector determines the best proxy based on
+//   1. xxx.xxx.<COUNTRY CODE>
+//   2. xxx.DOMAIN
+//   3. country(IP)
+//
 impl Future for Connecter {
     type Item = TcpStream;
     type Error = io::Error;
@@ -53,6 +57,15 @@ impl Future for Connecter {
         loop {
             self.state = match self.state {
                 State::Resolve(ref mut fut) => {
+                    let lookup_ip = try_ready!(fut.poll());
+                    let liter = lookup_ip.iter();
+                    let mut ips = vec!();
+                    for ip in liter {
+                        ips.push(ip);
+                    }
+                    State::AnalyzeIps(ips)
+                },
+                State::AnalyzeIps(ref ips) => {
                     State::Done
                 },
                 State::Done => {
