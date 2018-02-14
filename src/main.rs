@@ -226,15 +226,12 @@ fn main() {
         handle.spawn(
             socks_fut::socks_handshake(socket)
                 .and_then(move |(source,addr,request,_port,_cmd)| {
-                    println!("connect tcp proxy");
-                    let connecting = connecter::resolve_connect(resolver2,&addr,handle2);
-                    connecting
+                    println!("select best proxy for destination");
+                    connecter::resolve_connect(resolver2,&addr,handle2)
                         .and_then(|dest| {
-                            println!("connect proxy");
                             socks_fut::socks_connect_handshake(dest,request)
                         })
                         .and_then(|dest|{
-                            println!("do transfer");
                             let c1 = Rc::new(source);
                             let c2 = Rc::new(dest);
 
