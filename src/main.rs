@@ -38,6 +38,7 @@ mod message;
 mod transfer;
 mod socks_fut;
 mod resolver;
+mod connecter;
 
 //
 // The following streams/futures are executed:
@@ -225,14 +226,8 @@ fn main() {
         handle.spawn(
             socks_fut::socks_handshake(socket)
                 .and_then(move |(source,addr,request,_port,_cmd)| {
-                    if let socks_fut::Addr::DOMAIN(mut host) = addr {
-                        host.push(b'.');
-                        let host = String::from_utf8(host).unwrap();
-                        let lookup_future = resolver2.lookup_ip(&host);
-                    };
                     println!("connect tcp proxy");
-                    let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
-                    let connecting = TcpStream::connect(&sa,&handle2);
+                    let connecting = connecter::resolve_connect(resolver2,&addr,handle2);
                     connecting
                         .and_then(|dest| {
                             println!("connect proxy");
