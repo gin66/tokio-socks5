@@ -1,6 +1,6 @@
 
 use std::io::{self};
-use std::net::{SocketAddr,IpAddr, Ipv4Addr};
+use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
 
@@ -95,31 +95,49 @@ fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
     Some(code)
 }
 
-pub fn read_dbip() {
-    let mut rdr = csv::Reader::from_path("dbip-country-2017-12.csv").unwrap();
-    for result in rdr.records() {
-        match result {
-            Err(err) => (),
-            Ok(record) => {
-                if let (Some(ip_from),Some(ip_to),Some(country)) = (record.get(0),record.get(1),record.get(2)) {
-                    let ip_from = ip_from.parse::<IpAddr>();
-                    let ip_to   = ip_to.parse::<IpAddr>();
-                    let lcountry = country.to_lowercase();
-                    let cb = lcountry.as_bytes();
-                    let code = country_hash(&[cb[0],cb[1]]);
-                    if let (Ok(ip_from),Ok(ip_to),Some(code)) = (ip_from,ip_to,code) {
-                        // This reads ipv4 and ipv6 addresses
-                        ()
-                        //println!("{:?}-{:?}: {}/{:?}", ip_from, ip_to, country, code);
-                    }
-                    else {
-                        println!("Unreadable record: {:?}",record)
+pub struct Connecter {
+    dbip: Vec<(Ipv4Addr,Ipv4Addr,usize)>
+}
+
+impl Connecter {
+    pub fn new() -> Connecter {
+        Connecter {
+            dbip: vec!()
+        }
+    }
+
+    pub fn read_dbip(&mut self) {
+        println!("Read dbip...");
+        let mut rdr = csv::Reader::from_path("dbip-country-2017-12.csv").unwrap();
+        for result in rdr.records() {
+            match result {
+                Err(err) => (),
+                Ok(record) => {
+                    if let (Some(ip_from),Some(ip_to),Some(country)) = (record.get(0),record.get(1),record.get(2)) {
+                        let lcountry = country.to_lowercase();
+                        let cb = lcountry.as_bytes();
+                        let code = country_hash(&[cb[0],cb[1]]);
+                        let ipv4_from = ip_from.parse::<Ipv4Addr>();
+                        let ipv4_to   = ip_to.parse::<Ipv4Addr>();
+                        if let (Ok(ipv4_from),Ok(ipv4_to),Some(code)) = (ipv4_from,ipv4_to,code) {
+                            self.dbip.push( (ipv4_from,ipv4_to,code) );
+                            //println!("{:?}-{:?}: {}/{:?}", ip_from, ip_to, country, code);
+                            continue
+                        };
+                        let ipv6_from = ip_from.parse::<Ipv6Addr>();
+                        let ipv6_to   = ip_to.parse::<Ipv6Addr>();
+                        if let (Ok(ipv6_from),Ok(ipv6_to),Some(code)) = (ipv6_from,ipv6_to,code) {
+                            continue
+                        }
+                        else {
+                            println!("Unreadable record: {:?}",record)
+                        }
                     }
                 }
             }
         }
+        println!("Read finished");
     }
-    println!("Read finished");
 }
 
 enum State {
@@ -129,14 +147,14 @@ enum State {
     Connecting(TcpStreamNew)
 }
 
-pub struct Connecter {
+pub struct ConnecterFuture {
     handle: Handle,
     state: State
 }
 
 pub fn resolve_connect(resolver: Rc<ResolverFuture>,
                        addr: &socks_fut::Addr,
-                       handle: Handle) -> Connecter {
+                       handle: Handle) -> ConnecterFuture {
     let state = match *addr {
         socks_fut::Addr::DOMAIN(ref host) => {
             let hlen = host.len();
@@ -165,7 +183,7 @@ pub fn resolve_connect(resolver: Rc<ResolverFuture>,
             State::AnalyzeIps(ips)
         }
     };
-    Connecter {
+    ConnecterFuture {
         handle: handle,
         state
     }
@@ -177,12 +195,11 @@ pub fn resolve_connect(resolver: Rc<ResolverFuture>,
 //   2. xxx.DOMAIN => loop up
 //   3. country(IP)
 //
-impl Future for Connecter {
+impl Future for ConnecterFuture {
     type Item = TcpStream;
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
-
         loop {
             self.state = match self.state {
                 State::Resolve(ref mut fut) => {

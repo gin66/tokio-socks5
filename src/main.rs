@@ -77,7 +77,8 @@ fn main() {
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
 
-    connecter::read_dbip();
+    let mut conn = connecter::Connecter::new();
+    conn.read_dbip();
 
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();
