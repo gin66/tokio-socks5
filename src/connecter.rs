@@ -13,7 +13,6 @@ use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socks_fut;
 use csv;
 
-
 const COUNTRY: &str = "mmsmcmgbbssbmasccgmtgsggtmpsamncatclbgpmkmlsttngagisnpalckptkgnaimvcitla\
                        esknltfmdmusinilkecnfkrsvgdkhtvaumfieglrughnzmhkidjpgetreerwslvnuafjmzad\
                        zzwfomytdebarobthuyebliqaxkzbviobnebjocvuzbfrcdobhrsjeplucobirsopnocfbos\
@@ -212,7 +211,7 @@ impl Connecter {
                     },
                     Some(code) => {
                         println!("found country code {}",code2country(code));
-                        let mut codes: Vec<usize> = vec!(code);
+                        let codes: Vec<usize> = vec!(code);
                         State::SelectProxy(codes)
                     }
                 }
