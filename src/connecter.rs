@@ -3,6 +3,7 @@ use std::io::{self,Write};
 use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
+use std::time::{Duration, Instant};
 
 use futures::{Future, Async};
 use tokio_core::net::{TcpStream,TcpStreamNew};
@@ -190,7 +191,8 @@ pub struct ConnecterFuture {
     state: State,
     connecter: Rc<Connecter>,
     request: Bytes,
-    source: Rc<TcpStream>
+    source: Rc<TcpStream>,
+    start: Option<Instant>
 }
 
 impl Connecter {
@@ -232,7 +234,8 @@ impl Connecter {
             state,
             connecter: conn,
             request,
-            source
+            source,
+            start: None
         }
     }
 }
@@ -282,18 +285,28 @@ impl Future for ConnecterFuture {
                 },
                 State::Connecting(ref mut fut) => {
                     let proxy = try_ready!(fut.poll());
+                    self.start = Some(Instant::now());
                     State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
                 },
                 State::WaitHandshake(ref mut fut) => {
                     // Trick from Transfer: Make sure we can write the response !
+                    // => This avoids storing the response somewhere.
                     let write_ready = self.source.poll_write().is_ready();
                     if !write_ready {
                         return Ok(Async::NotReady)
                     }
                     let (stream,response) = try_ready!(fut.poll());
-                    // Till here is time between local and socks-proxy.
-                    // Connection to destination not started.
-                    // For this need to wait the socks response
+                    let dt = match self.start {
+                        Some(start) => {
+                            let dt = start.elapsed();
+                            let millis = (dt.as_secs()*1000)+((dt.subsec_nanos()/1_000_000) as u64);
+                            Some(millis)
+                        },
+                        None => None
+                    };
+                    println!("Time for connection {:?} ms",dt);
+                    // Here can measure the round trip until remote socks server
+                    // reports success - still that server can cheat for connect to final destination.
                     let m = try!((&*self.source).write(&response.to_vec()));
                     assert_eq!(response.len(), m);
                     return Ok(Async::Ready(stream));
