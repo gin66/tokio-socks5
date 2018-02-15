@@ -61,11 +61,11 @@ static R: &'static [isize] = &[1, 255, 255, 255, 255, 255, 255, 255, 255, 255, 2
 //                            +"QA RE RO RS RU RW SA SB SC SD SE SG SH SI SJ SK SL SM SN SO SR SS ST SV SX SY SZ "
 //                            +"TC TD TF TG TH TJ TK TL TM TN TO TR TT TV TW TZ UA UG UM US UY UZ "
 //                            +"VA VC VE VG VI VN VU WF WS XK YE YT ZA ZM ZW ZZ ";
-pub fn code2country(code: usize) -> String {
+fn code2country(code: usize) -> String {
     COUNTRY[code..(code+2)].to_string()
 }
 
-pub fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
+fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
     const T: usize = 178;
     const NEG_OFFSET: usize = 0;
     let x: usize = (((cn_code[0] as u16)<<8)+(cn_code[1] as u16)) as usize;
@@ -97,8 +97,8 @@ pub fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
 enum State {
     Resolve(LookupIpFuture),
     AnalyzeIps(Vec<IpAddr>),
-    Connecting(TcpStreamNew),
-    Done
+    SelectProxy(Option<usize>),
+    Connecting(TcpStreamNew)
 }
 
 pub struct Connecter {
@@ -112,18 +112,25 @@ pub fn resolve_connect(resolver: Rc<ResolverFuture>,
     let state = match *addr {
         socks_fut::Addr::DOMAIN(ref host) => {
             let hlen = host.len();
-            if (hlen > 4) && (host[hlen-3] == b'.') {
-                // possible country code
-                println!("Country code: {} {}",host[(hlen-2)],host[(hlen-1)]);
-                match country_hash(&[host[hlen-2],host[hlen-1]]) {
-                    None => (),
-                    Some(code) => println!("found country code {}",code2country(code))
+            let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
+                    // possible country code
+                    country_hash(&[host[hlen-2],host[hlen-1]])
+                }
+                else {
+                    None
+                };
+            match ccode {
+                None => {
+                    let mut host = host.to_vec();
+                    host.push(b'.');
+                    let host = String::from_utf8(host).unwrap();
+                    State::Resolve(resolver.lookup_ip(&host))
+                },
+                Some(code) => {
+                    println!("found country code {}",code2country(code));
+                    State::SelectProxy(Some(code))
                 }
             }
-            let mut host = host.to_vec();
-            host.push(b'.');
-            let host = String::from_utf8(host).unwrap();
-            State::Resolve(resolver.lookup_ip(&host))
         },
         socks_fut::Addr::IP(ref ip) => {
             let ips = vec!(*ip);
@@ -160,9 +167,10 @@ impl Future for Connecter {
                     State::AnalyzeIps(ips)
                 },
                 State::AnalyzeIps(ref ips) => {
-                    State::Done
+                    let code = country_hash(b"de");
+                    State::SelectProxy(code)
                 },
-                State::Done => {
+                State::SelectProxy(code) => {
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                 },
