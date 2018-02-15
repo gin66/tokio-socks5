@@ -12,6 +12,7 @@ extern crate trust_dns_resolver;
 extern crate clap;
 extern crate ini;
 extern crate bytes;
+extern crate csv;
 
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
@@ -75,6 +76,8 @@ fn main() {
         (@arg peers:  -p --peers  +takes_value   "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
+
+    connecter::read_dbip();
 
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();

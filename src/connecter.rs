@@ -11,6 +11,8 @@ use tokio_core::reactor::Handle;
 use trust_dns_resolver::ResolverFuture;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socks_fut;
+use csv;
+
 
 const COUNTRY: &str = "mmsmcmgbbssbmasccgmtgsggtmpsamncatclbgpmkmlsttngagisnpalckptkgnaimvcitla\
                        esknltfmdmusinilkecnfkrsvgdkhtvaumfieglrughnzmhkidjpgetreerwslvnuafjmzad\
@@ -92,6 +94,22 @@ fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
         return None;
     }
     Some(code)
+}
+
+pub fn read_dbip() {
+    let mut rdr = csv::Reader::from_path("dbip-country-2017-12.csv").unwrap();
+    for result in rdr.records() {
+        match result {
+            Err(err) => (),
+            Ok(record) => {
+                if let (Some(ip_from),Some(ip_to),Some(country)) = (record.get(0),record.get(1),record.get(2)) {
+                    println!("({}-{}): {}", ip_from, ip_to, country);
+                }
+            }
+        }
+        //let (ip_from, ip_to, country): (String, String, String) = record.unwrap();
+        //println!("({}, {}): {}", ip_from, ip_to, country);
+    }
 }
 
 enum State {
