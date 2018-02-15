@@ -97,7 +97,7 @@ fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
 }
 
 pub struct Connecter {
-    dbip: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
+    dbip_v4: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
     resolver: ResolverFuture,
     handle: Handle
 }
@@ -108,7 +108,7 @@ impl Connecter {
                                         ResolverOpts::default(), 
                                         &handle);
         Connecter {
-            dbip: vec!(),
+            dbip_v4: vec!(),
             resolver,
             handle
         }
@@ -128,7 +128,7 @@ impl Connecter {
                         let ipv4_from = ip_from.parse::<Ipv4Addr>();
                         let ipv4_to   = ip_to.parse::<Ipv4Addr>();
                         if let (Ok(ipv4_from),Ok(ipv4_to),Some(code)) = (ipv4_from,ipv4_to,code) {
-                            self.dbip.push( (ipv4_from,ipv4_to,code) );
+                            self.dbip_v4.push( (ipv4_from,ipv4_to,code) );
                             //println!("{:?}-{:?}: {}/{:?}", ip_from, ip_to, country, code);
                             continue
                         };
@@ -145,6 +145,35 @@ impl Connecter {
             }
         }
         println!("Read finished");
+    }
+
+    fn determine_country(&self,ip: &IpAddr) -> Option<usize> {
+        match ip {
+            &IpAddr::V4(ref ipv4) => {
+                let mut i: usize = 0;
+                let mut j: usize = self.dbip_v4.len()-1;
+                while i < j {
+                    println!("{} {}",i,j);
+                    let k: usize = (i+j)/2;
+                    let (ip_from,ip_to,code) = self.dbip_v4[k];
+                    if ip_from > *ipv4 {
+                        j = k-1
+                    }
+                    else if ip_to < *ipv4 {
+                        i = k+1
+                    }
+                    else {
+                        return Some(code)
+                    }
+                }
+                let (ip_from,ip_to,code) = self.dbip_v4[j];
+                if (ip_from <= *ipv4) && (ip_to >= *ipv4) {
+                    return Some(code)
+                }
+                None
+            },
+            &IpAddr::V6(ref ipv6) => None
+        }
     }
 }
 
@@ -223,6 +252,15 @@ impl Future for ConnecterFuture {
                     State::AnalyzeIps(ips)
                 },
                 State::AnalyzeIps(ref ips) => {
+                    for ip in ips {
+                        let code = self.connecter.determine_country(ip);
+                        match code {
+                            Some(code) => 
+                                println!("IP {:?}  {:?}",ip,code2country(code)),
+                            None => 
+                                println!("IP {:?}  unknown",ip)
+                        }
+                    };
                     let code = country_hash(b"de");
                     State::SelectProxy(code)
                 },
