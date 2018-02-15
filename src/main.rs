@@ -77,9 +77,6 @@ fn main() {
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
 
-    let mut conn = connecter::Connecter::new();
-    conn.read_dbip();
-
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();
 
@@ -114,6 +111,9 @@ fn main() {
     //let buffer = Rc::new(RefCell::new(vec![0; 64 * 1024]));
     let handle = lp.handle();
     let listener = TcpListener::bind(&addr, &handle).unwrap();
+
+    let mut conn = connecter::Connecter::new(handle.clone());
+    conn.read_dbip();
 
     let my_id = 1;
     let secret = 1;
@@ -221,17 +221,14 @@ fn main() {
     // progress concurrently with all other connections.
     println!("Listening for socks5 proxy connections on {}", addr);
     let handle = lp.handle();
-    let resolver = Rc::new(ResolverFuture::new(ResolverConfig::default(),
-                                    ResolverOpts::default(), 
-                                    &handle));
+    let conn = Rc::new(conn);
     let server = listener.incoming().for_each(|(socket, _addr)| {
-        let handle2 = handle.clone();
-        let resolver2 = resolver.clone();
+        let conn2 = conn.clone();
         handle.spawn(
             socks_fut::socks_handshake(socket)
                 .and_then(move |(source,addr,request,_port,_cmd)| {
                     println!("select best proxy for destination");
-                    connecter::resolve_connect(resolver2,&addr,handle2)
+                    conn2.resolve_connect(&addr)
                         .and_then(|dest| {
                             socks_fut::socks_connect_handshake(dest,request)
                         })

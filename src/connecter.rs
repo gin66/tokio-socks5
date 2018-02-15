@@ -7,6 +7,7 @@ use std::option::Option;
 use futures::{Future, Async};
 use tokio_core::net::{TcpStream,TcpStreamNew};
 use tokio_core::reactor::Handle;
+use trust_dns_resolver::config::*;
 use trust_dns_resolver::ResolverFuture;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socks_fut;
@@ -96,13 +97,20 @@ fn country_hash(cn_code: &[u8;2]) -> Option<usize> {
 }
 
 pub struct Connecter {
-    dbip: Vec<(Ipv4Addr,Ipv4Addr,usize)>
+    dbip: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
+    resolver: ResolverFuture,
+    handle: Handle
 }
 
 impl Connecter {
-    pub fn new() -> Connecter {
+    pub fn new(handle: Handle) -> Connecter {
+        let resolver = ResolverFuture::new(ResolverConfig::default(),
+                                        ResolverOpts::default(), 
+                                        &handle);
         Connecter {
-            dbip: vec!()
+            dbip: vec!(),
+            resolver,
+            handle
         }
     }
 
@@ -152,40 +160,41 @@ pub struct ConnecterFuture {
     state: State
 }
 
-pub fn resolve_connect(resolver: Rc<ResolverFuture>,
-                       addr: &socks_fut::Addr,
-                       handle: Handle) -> ConnecterFuture {
-    let state = match *addr {
-        socks_fut::Addr::DOMAIN(ref host) => {
-            let hlen = host.len();
-            let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
-                    // possible country code
-                    country_hash(&[host[hlen-2],host[hlen-1]])
+impl Connecter {
+    pub fn resolve_connect(self: &Connecter,
+                        addr: &socks_fut::Addr) -> ConnecterFuture {
+        let state = match *addr {
+            socks_fut::Addr::DOMAIN(ref host) => {
+                let hlen = host.len();
+                let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
+                        // possible country code
+                        country_hash(&[host[hlen-2],host[hlen-1]])
+                    }
+                    else {
+                        None
+                    };
+                match ccode {
+                    None => {
+                        let mut host = host.to_vec();
+                        host.push(b'.');
+                        let host = String::from_utf8(host).unwrap();
+                        State::Resolve(self.resolver.lookup_ip(&host))
+                    },
+                    Some(code) => {
+                        println!("found country code {}",code2country(code));
+                        State::SelectProxy(Some(code))
+                    }
                 }
-                else {
-                    None
-                };
-            match ccode {
-                None => {
-                    let mut host = host.to_vec();
-                    host.push(b'.');
-                    let host = String::from_utf8(host).unwrap();
-                    State::Resolve(resolver.lookup_ip(&host))
-                },
-                Some(code) => {
-                    println!("found country code {}",code2country(code));
-                    State::SelectProxy(Some(code))
-                }
+            },
+            socks_fut::Addr::IP(ref ip) => {
+                let ips = vec!(*ip);
+                State::AnalyzeIps(ips)
             }
-        },
-        socks_fut::Addr::IP(ref ip) => {
-            let ips = vec!(*ip);
-            State::AnalyzeIps(ips)
+        };
+        ConnecterFuture {
+            handle: self.handle.clone(),
+            state
         }
-    };
-    ConnecterFuture {
-        handle: handle,
-        state
     }
 }
 
