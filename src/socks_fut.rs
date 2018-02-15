@@ -14,8 +14,7 @@ use tokio_io::io::{read_exact, write_all, ReadExact, WriteAll};
 use tokio_core::net::{TcpStream};
 use futures::*;
 use futures::Async;
-use bytes::BytesMut;
-use bytes::BufMut;
+use bytes::{BufMut,Bytes,BytesMut};
 
 #[allow(dead_code)]
 mod v5 {
@@ -70,7 +69,7 @@ pub struct SocksHandshake {
 }
 
 pub struct SocksConnectHandshake {
-    request: BytesMut,
+    request: Bytes,
     state: ClientState
 }
 
@@ -83,7 +82,7 @@ pub fn socks_handshake(stream: TcpStream) -> SocksHandshake {
     }
 }
 
-pub fn socks_connect_handshake(stream: TcpStream,request: BytesMut) -> SocksConnectHandshake {
+pub fn socks_connect_handshake(stream: TcpStream,request: Bytes) -> SocksConnectHandshake {
     SocksConnectHandshake { 
         request,
         state: ClientState::WaitSentAuthentication(
@@ -236,7 +235,7 @@ impl Future for SocksConnectHandshake {
                         return Err(Error::new(ErrorKind::Other, "No Socks5 proxy found"));
                     }
                     WaitSentRequest(
-                        write_all(stream,self.request.take().to_vec())
+                        write_all(stream,self.request.to_vec())
                     )
                 }
                 WaitSentRequest(ref mut fut) => {
