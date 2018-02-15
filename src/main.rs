@@ -249,9 +249,10 @@ fn main() {
                 .and_then(move |(source,addr,request,_port,_cmd)| {
                     println!("select best proxy for destination");
                     let request = request.freeze();
-                    conn2.resolve_connect(conn2.clone(),&addr,request.clone())
+                    let source  = Rc::new(source);
+                    conn2.resolve_connect(conn2.clone(),source.clone(),&addr,request.clone())
                         .and_then(|dest|{
-                            let c1 = Rc::new(source);
+                            let c1 = source;
                             let c2 = Rc::new(dest);
 
                             let half1 = transfer::Transfer::new(c1.clone(), c2.clone());

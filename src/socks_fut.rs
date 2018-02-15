@@ -44,8 +44,8 @@ mod v5 {
     pub const REP_CMD_NOT_SUPPORTED: u8 = 7;
     pub const REP_ATYP_NOT_SUPPORTED: u8 = 8;
 
-    // 6 Bytes+4 Bytes for IP
-    pub const MIN_REQUEST_SIZE: usize = 6+4;
+    // 6 Bytes+2 Bytes for DOMAIN
+    pub const MIN_REQUEST_SIZE: usize = 6+2;
     // 6 Bytes+addr (1 Byte length + non terminated string)
     pub const MAX_REQUEST_SIZE: usize = 6+1+255;
 }
@@ -54,13 +54,14 @@ enum ServerState {
     WaitClientAuthentication(ReadExact<TcpStream,Vec<u8>>),
     ReadAuthenticationMethods(ReadExact<TcpStream,Vec<u8>>),
     AnswerNoAuthentication(WriteAll<TcpStream,Vec<u8>>),
-    WaitClientRequest(ReadExact<TcpStream,Vec<u8>>),
+    WaitClientRequest(ReadExact<TcpStream,Vec<u8>>)
 }
 
 enum ClientState {
     WaitSentAuthentication(WriteAll<TcpStream,Vec<u8>>),
     WaitAuthenticationMethod(ReadExact<TcpStream,Vec<u8>>),
-    WaitSentRequest(WriteAll<TcpStream,Vec<u8>>)
+    WaitSentRequest(WriteAll<TcpStream,Vec<u8>>),
+    WaitReply(ReadExact<TcpStream,Vec<u8>>)
 }
 
 pub struct SocksHandshake {
@@ -70,7 +71,8 @@ pub struct SocksHandshake {
 
 pub struct SocksConnectHandshake {
     request: Bytes,
-    state: ClientState
+    state: ClientState,
+    response: BytesMut
 }
 
 pub fn socks_handshake(stream: TcpStream) -> SocksHandshake {
@@ -87,7 +89,8 @@ pub fn socks_connect_handshake(stream: TcpStream,request: Bytes) -> SocksConnect
         request,
         state: ClientState::WaitSentAuthentication(
             write_all(stream,vec![v5::VERSION,1u8,v5::METH_NO_AUTH])
-        )
+        ),
+        response: BytesMut::with_capacity(v5::MAX_REQUEST_SIZE)
     }
 }
 
@@ -215,7 +218,7 @@ impl Future for SocksHandshake {
 }
 
 impl Future for SocksConnectHandshake {
-    type Item = (TcpStream);
+    type Item = (TcpStream,Bytes);
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
@@ -228,7 +231,7 @@ impl Future for SocksConnectHandshake {
                     WaitAuthenticationMethod(
                         read_exact(stream,vec![0u8; 2])
                     )
-                }
+                },
                 WaitAuthenticationMethod(ref mut fut) => {
                     let (stream,buf) = try_ready!(fut.poll());
                     if (buf[0] != v5::VERSION) || (buf[1] != 0) {
@@ -237,10 +240,43 @@ impl Future for SocksConnectHandshake {
                     WaitSentRequest(
                         write_all(stream,self.request.to_vec())
                     )
-                }
+                },
                 WaitSentRequest(ref mut fut) => {
                     let (stream,_buf) = try_ready!(fut.poll());
-                    return Ok(Async::Ready((stream)));
+                    WaitReply(
+                        read_exact(stream,vec![0u8; v5::MIN_REQUEST_SIZE])
+                    )
+                },
+                WaitReply(ref mut fut) => {
+                    let (stream,buf) = try_ready!(fut.poll());
+                    self.response.put_slice(&buf);
+                    if self.response[0] != v5::VERSION {
+                        return Err(Error::new(ErrorKind::Other, "Not Socks5 response"))
+                    };
+                    if self.response[2] != 0 {
+                        return Err(Error::new(ErrorKind::Other, 
+                                "Reserved field in socks5 response is not 0x00"))
+                    };
+                    if self.response[2] != self.response[2] {
+                        return Err(Error::new(ErrorKind::Other, "Response command differs from request"))
+                    };
+                    let dst_len =
+                        match self.response[3] {
+                            v5::ATYP_IPV4   => 4,
+                            v5::ATYP_IPV6   => 16,
+                            v5::ATYP_DOMAIN => self.response[4]+1,
+                            _ => return Err(Error::new(ErrorKind::Other, 
+                                                "Unknown address typ in socks5 response"))
+                        };
+                    let delta = (dst_len as usize) + 6 - self.response.len();
+                    if delta > 0 {
+                        WaitReply(
+                            read_exact(stream,vec![0u8; delta])
+                        )
+                    }
+                    else {
+                        return Ok(Async::Ready((stream,self.response.take().freeze())));
+                    }
                 }
             }
         }

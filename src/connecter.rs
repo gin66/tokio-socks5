@@ -1,5 +1,5 @@
 
-use std::io::{self};
+use std::io::{self,Write};
 use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
@@ -189,11 +189,13 @@ pub struct ConnecterFuture {
     handle: Handle,
     state: State,
     connecter: Rc<Connecter>,
-    request: Bytes
+    request: Bytes,
+    source: Rc<TcpStream>
 }
 
 impl Connecter {
     pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
+                        source: Rc<TcpStream>,
                         addr: &socks_fut::Addr,
                         request: Bytes) -> ConnecterFuture {
         let state = match *addr {
@@ -229,7 +231,8 @@ impl Connecter {
             handle: self.handle.clone(),
             state,
             connecter: conn,
-            request
+            request,
+            source
         }
     }
 }
@@ -282,11 +285,18 @@ impl Future for ConnecterFuture {
                     State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
                 },
                 State::WaitHandshake(ref mut fut) => {
-                    let result = try_ready!(fut.poll());
+                    // Trick from Transfer: Make sure we can write the response !
+                    let write_ready = self.source.poll_write().is_ready();
+                    if !write_ready {
+                        return Ok(Async::NotReady)
+                    }
+                    let (stream,response) = try_ready!(fut.poll());
                     // Till here is time between local and socks-proxy.
                     // Connection to destination not started.
                     // For this need to wait the socks response
-                    return Ok(Async::Ready((result)));
+                    let m = try!((&*self.source).write(&response.to_vec()));
+                    assert_eq!(response.len(), m);
+                    return Ok(Async::Ready(stream));
                 }
             }
         }
