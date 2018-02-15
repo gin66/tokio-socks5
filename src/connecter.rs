@@ -157,11 +157,12 @@ enum State {
 
 pub struct ConnecterFuture {
     handle: Handle,
-    state: State
+    state: State,
+    connecter: Rc<Connecter>
 }
 
 impl Connecter {
-    pub fn resolve_connect(self: &Connecter,
+    pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
                         addr: &socks_fut::Addr) -> ConnecterFuture {
         let state = match *addr {
             socks_fut::Addr::DOMAIN(ref host) => {
@@ -193,7 +194,8 @@ impl Connecter {
         };
         ConnecterFuture {
             handle: self.handle.clone(),
-            state
+            state,
+            connecter: conn
         }
     }
 }
