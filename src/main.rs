@@ -31,14 +31,12 @@ use futures::stream::{SplitSink,SplitStream};
 //use tokio_io::io::{read_exact, write_all, Window};
 use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
-use trust_dns_resolver::ResolverFuture;
-use trust_dns_resolver::config::*;
 use ini::Ini;
 
 mod message;
 mod transfer;
 mod socks_fut;
-mod resolver;
+//mod resolver;
 mod connecter;
 
 //
@@ -57,14 +55,6 @@ mod connecter;
 fn main() {
     drop(env_logger::init());
 
-    let i = Ini::load_from_file("config.ini").unwrap();
-    for (sec, prop) in i.iter() {
-        println!("Section: {:?}", *sec);
-        for (k, v) in prop.iter() {
-            println!("{}:{}", *k, *v);
-        }
-    }
-
     let matches = clap_app!(uservpn_socks5 =>
         (version: crate_version!())
         (author: "Jochen Kiemes <jochen@kiemes.de>")
@@ -76,6 +66,34 @@ fn main() {
         (@arg peers:  -p --peers  +takes_value   "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
+
+    let config_file = matches.value_of("config").unwrap_or("config.ini");
+    let config = Ini::load_from_file(config_file).unwrap();
+    for (sec, prop) in config.iter() {
+        println!("Section: {:?}", *sec);
+        for (k, v) in prop.iter() {
+            println!("   {}:{}", *k, *v);
+        }
+    }
+
+    let id = matches.value_of("id").unwrap();
+    let nodename = match config.get_from(Some("Nodes"), id) {
+        Some(name) => name,
+        None => {
+            println!("Node {} is not defined in config-file",id);
+            return
+        }
+    };
+    println!("This node is {} with name {}",id,nodename);
+
+    let nodeconfig = match config.section(Some(nodename)) { 
+        Some(section) => section,
+        None => {
+            println!("No section for node {} in config-file",nodename);
+            return
+        }
+    };
+    println!("{:?}",nodeconfig);
 
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();
