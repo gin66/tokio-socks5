@@ -1,11 +1,10 @@
 
 use std::io::{self};
-use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{SocketAddr,IpAddr, Ipv4Addr};
 use std::rc::Rc;
 use std::option::Option;
-use std::slice;
 
-use futures::{Future, Poll, Async};
+use futures::{Future, Async};
 use tokio_core::net::{TcpStream,TcpStreamNew};
 use tokio_core::reactor::Handle;
 use trust_dns_resolver::ResolverFuture;
@@ -103,13 +102,24 @@ pub fn read_dbip() {
             Err(err) => (),
             Ok(record) => {
                 if let (Some(ip_from),Some(ip_to),Some(country)) = (record.get(0),record.get(1),record.get(2)) {
-                    println!("({}-{}): {}", ip_from, ip_to, country);
+                    let ip_from = ip_from.parse::<IpAddr>();
+                    let ip_to   = ip_to.parse::<IpAddr>();
+                    let lcountry = country.to_lowercase();
+                    let cb = lcountry.as_bytes();
+                    let code = country_hash(&[cb[0],cb[1]]);
+                    if let (Ok(ip_from),Ok(ip_to),Some(code)) = (ip_from,ip_to,code) {
+                        // This reads ipv4 and ipv6 addresses
+                        ()
+                        //println!("{:?}-{:?}: {}/{:?}", ip_from, ip_to, country, code);
+                    }
+                    else {
+                        println!("Unreadable record: {:?}",record)
+                    }
                 }
             }
         }
-        //let (ip_from, ip_to, country): (String, String, String) = record.unwrap();
-        //println!("({}, {}): {}", ip_from, ip_to, country);
     }
+    println!("Read finished");
 }
 
 enum State {
