@@ -180,7 +180,7 @@ impl Connecter {
 enum State {
     Resolve(LookupIpFuture),
     AnalyzeIps(Vec<IpAddr>),
-    SelectProxy(Option<usize>),
+    SelectProxy(Vec<usize>),
     Connecting(TcpStreamNew)
 }
 
@@ -212,7 +212,8 @@ impl Connecter {
                     },
                     Some(code) => {
                         println!("found country code {}",code2country(code));
-                        State::SelectProxy(Some(code))
+                        let mut codes: Vec<usize> = vec!(code);
+                        State::SelectProxy(codes)
                     }
                 }
             },
@@ -252,19 +253,23 @@ impl Future for ConnecterFuture {
                     State::AnalyzeIps(ips)
                 },
                 State::AnalyzeIps(ref ips) => {
+                    let mut codes: Vec<usize> = vec!();
                     for ip in ips {
                         let code = self.connecter.determine_country(ip);
                         match code {
-                            Some(code) => 
-                                println!("IP {:?}  {:?}",ip,code2country(code)),
+                            Some(code) => {
+                                if !(codes.contains(&code)) {
+                                    codes.push(code);
+                                };
+                                println!("IP {:?} -> {:?}",ip,code2country(code))
+                            },
                             None => 
-                                println!("IP {:?}  unknown",ip)
+                                println!("IP {:?} -> unknown country",ip)
                         }
                     };
-                    let code = country_hash(b"de");
-                    State::SelectProxy(code)
+                    State::SelectProxy(codes)
                 },
-                State::SelectProxy(code) => {
+                State::SelectProxy(ref codes) => {
                     let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                 },
