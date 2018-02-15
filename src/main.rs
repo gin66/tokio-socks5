@@ -133,99 +133,101 @@ fn main() {
     let mut conn = connecter::Connecter::new(handle.clone());
     conn.read_dbip();
 
-    let my_id = 1;
-    let secret = 1;
-    let mut udp_sinks:   Vec<SplitSink<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
-    let mut udp_streams: Vec<SplitStream<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
-    for ad in listen_list {
-        println!("Listening for peer udp connections on {}", ad);
-        let comm_udp = UdpSocket::bind(&ad,&handle).unwrap();
-        let (udp_sink,udp_stream) = comm_udp.framed(message::MessageCodec {my_id,secret}).split();
-        udp_sinks.push(udp_sink);
-        udp_streams.push(udp_stream);
-    }
+    if false {
+        let my_id = 1;
+        let secret = 1;
+        let mut udp_sinks:   Vec<SplitSink<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
+        let mut udp_streams: Vec<SplitStream<tokio_core::net::UdpFramed<message::MessageCodec>>> = vec![]; 
+        for ad in listen_list {
+            println!("Listening for peer udp connections on {}", ad);
+            let comm_udp = UdpSocket::bind(&ad,&handle).unwrap();
+            let (udp_sink,udp_stream) = comm_udp.framed(message::MessageCodec {my_id,secret}).split();
+            udp_sinks.push(udp_sink);
+            udp_streams.push(udp_stream);
+        }
 
-    // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
-    //
-    // If several udp sockets are available, then use round robin for sending.
-    //
-    let (tx, rx): (Sender<(SocketAddr, Vec<u8>)>,Receiver<(SocketAddr, Vec<u8>)>) = mpsc::channel(100);
-    println!("number of listen sockets = {}",udp_sinks.len());
-    let counter: Vec<usize> = vec![0];
-    let counter = RefCell::new(counter);
-    let udp_sender = rx.for_each(move |msg| {
-        let mut counter = counter.borrow_mut();
-        println!("{:?}",counter);
-        let mut cnt = counter[0];
-        cnt = if cnt == udp_sinks.len()-1 {
-            0
-        } else { cnt + 1 };
-        counter[0] = cnt;
+        // The udp_sender is connected to a mspc, which receives messages compatible to MessageCodec.
+        //
+        // If several udp sockets are available, then use round robin for sending.
+        //
+        let (tx, rx): (Sender<(SocketAddr, Vec<u8>)>,Receiver<(SocketAddr, Vec<u8>)>) = mpsc::channel(100);
+        println!("number of listen sockets = {}",udp_sinks.len());
+        let counter: Vec<usize> = vec![0];
+        let counter = RefCell::new(counter);
+        let udp_sender = rx.for_each(move |msg| {
+            let mut counter = counter.borrow_mut();
+            println!("{:?}",counter);
+            let mut cnt = counter[0];
+            cnt = if cnt == udp_sinks.len()-1 {
+                0
+            } else { cnt + 1 };
+            counter[0] = cnt;
 
-        let res = udp_sinks[cnt].poll_complete();
-        match res {
-            Ok(_)  => println!("poll_complete is ok"),
-            Err(e) => {
-                match e.kind() {
-                    AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
-                    _ => println!("{:?}",e)
+            let res = udp_sinks[cnt].poll_complete();
+            match res {
+                Ok(_)  => println!("poll_complete is ok"),
+                Err(e) => {
+                    match e.kind() {
+                        AddrNotAvailable => panic!("Peer listen address like 127.0.0.1 does not work"),
+                        _ => println!("{:?}",e)
+                    }
                 }
-            }
-        };
-        let _res = udp_sinks[cnt].start_send(msg).unwrap();
-        // The stream will stop on `Err`, so we need to return `Ok`.
-        Ok(())
-    });
-    handle.spawn(udp_sender);
+            };
+            let _res = udp_sinks[cnt].start_send(msg).unwrap();
+            // The stream will stop on `Err`, so we need to return `Ok`.
+            Ok(())
+        });
+        handle.spawn(udp_sender);
 
-    // The duty of the initiator is trying to connect to the peers 
-    // unless connection is established. 
-    // Connect means to send a Hello message with info about self.
-    //
-    // Implementation is a periodic task, which basically should do:
-    //      1. Iterate through the list of static peers.
-    //      2. Check (who) if the peer is already connected
-    //      3. If peer is not connected, initiate sending Hello message
-    //
-    // initiator helds a future to be waited for
-    if false {
-        let peer_list2 = peer_list.clone();
-        let tx2 = tx.clone();
-        let handle2 = handle.clone();
-        let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                    Duration::new(10,0),&handle).unwrap()
-                            .for_each(move |_| {
-                                for ad in &peer_list2 {
-                                    println!("Send Init to {}",ad);
-                                    let thread_tx = tx2.clone();
-                                    let buf: Vec<u8> = vec![0;10];
-                                    let msg = (ad.clone(),buf);
-                                    handle2.spawn(thread_tx.send(msg)
-                                                    .then( |_| { Ok(())}));
-                                };
-                                Ok(())
-                            })
-                            .then( |_| { Ok(())});
-        handle.spawn(initiator);
-    }
+        // The duty of the initiator is trying to connect to the peers 
+        // unless connection is established. 
+        // Connect means to send a Hello message with info about self.
+        //
+        // Implementation is a periodic task, which basically should do:
+        //      1. Iterate through the list of static peers.
+        //      2. Check (who) if the peer is already connected
+        //      3. If peer is not connected, initiate sending Hello message
+        //
+        // initiator helds a future to be waited for
+        if false {
+            let peer_list2 = peer_list.clone();
+            let tx2 = tx.clone();
+            let handle2 = handle.clone();
+            let initiator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                        Duration::new(10,0),&handle).unwrap()
+                                .for_each(move |_| {
+                                    for ad in &peer_list2 {
+                                        println!("Send Init to {}",ad);
+                                        let thread_tx = tx2.clone();
+                                        let buf: Vec<u8> = vec![0;10];
+                                        let msg = (ad.clone(),buf);
+                                        handle2.spawn(thread_tx.send(msg)
+                                                        .then( |_| { Ok(())}));
+                                    };
+                                    Ok(())
+                                })
+                                .then( |_| { Ok(())});
+            handle.spawn(initiator);
+        }
 
-    if false {
-        let handle2 = handle.clone();
-        let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
-                                    Duration::new(1,0),&handle).unwrap()
-                            .for_each(move |_| {
-                                for ad in &peer_list {
-                                    println!("Send Data to {}",ad);
-                                    let thread_tx = tx.clone();
-                                    let buf: Vec<u8> = vec![0;10];
-                                    let msg = (ad.clone(),buf);
-                                    handle2.spawn(thread_tx.send(msg)
-                                                    .then( |_| { Ok(())}));
-                                };
-                                Ok(())
-                            })
-                            .then( |_| { Ok(())});
-        handle.spawn(communicator);
+        if false {
+            let handle2 = handle.clone();
+            let communicator = Interval::new_at(Instant::now()+Duration::new(1,0),
+                                        Duration::new(1,0),&handle).unwrap()
+                                .for_each(move |_| {
+                                    for ad in &peer_list {
+                                        println!("Send Data to {}",ad);
+                                        let thread_tx = tx.clone();
+                                        let buf: Vec<u8> = vec![0;10];
+                                        let msg = (ad.clone(),buf);
+                                        handle2.spawn(thread_tx.send(msg)
+                                                        .then( |_| { Ok(())}));
+                                    };
+                                    Ok(())
+                                })
+                                .then( |_| { Ok(())});
+            handle.spawn(communicator);
+        }
     }
 
     // Construct a future representing our server. This future processes all
