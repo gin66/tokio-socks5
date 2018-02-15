@@ -12,6 +12,7 @@ use trust_dns_resolver::ResolverFuture;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socks_fut;
 use csv;
+use bytes::Bytes;
 
 const COUNTRY: &str = "mmsmcmgbbssbmasccgmtgsggtmpsamncatclbgpmkmlsttngagisnpalckptkgnaimvcitla\
                        esknltfmdmusinilkecnfkrsvgdkhtvaumfieglrughnzmhkidjpgetreerwslvnuafjmzad\
@@ -180,18 +181,21 @@ enum State {
     Resolve(LookupIpFuture),
     AnalyzeIps(Vec<IpAddr>),
     SelectProxy(Vec<usize>),
-    Connecting(TcpStreamNew)
+    Connecting(TcpStreamNew),
+    WaitHandshake(socks_fut::SocksConnectHandshake)
 }
 
 pub struct ConnecterFuture {
     handle: Handle,
     state: State,
-    connecter: Rc<Connecter>
+    connecter: Rc<Connecter>,
+    request: Bytes
 }
 
 impl Connecter {
     pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
-                        addr: &socks_fut::Addr) -> ConnecterFuture {
+                        addr: &socks_fut::Addr,
+                        request: Bytes) -> ConnecterFuture {
         let state = match *addr {
             socks_fut::Addr::DOMAIN(ref host) => {
                 let hlen = host.len();
@@ -224,7 +228,8 @@ impl Connecter {
         ConnecterFuture {
             handle: self.handle.clone(),
             state,
-            connecter: conn
+            connecter: conn,
+            request
         }
     }
 }
@@ -273,6 +278,10 @@ impl Future for ConnecterFuture {
                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                 },
                 State::Connecting(ref mut fut) => {
+                    let proxy = try_ready!(fut.poll());
+                    State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
+                },
+                State::WaitHandshake(ref mut fut) => {
                     return fut.poll();
                 }
             }

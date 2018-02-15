@@ -248,10 +248,8 @@ fn main() {
             socks_fut::socks_handshake(socket)
                 .and_then(move |(source,addr,request,_port,_cmd)| {
                     println!("select best proxy for destination");
-                    conn2.resolve_connect(conn2.clone(),&addr)
-                        .and_then(|dest| {
-                            socks_fut::socks_connect_handshake(dest,request)
-                        })
+                    let request = request.freeze();
+                    conn2.resolve_connect(conn2.clone(),&addr,request.clone())
                         .and_then(|dest|{
                             let c1 = Rc::new(source);
                             let c2 = Rc::new(dest);
