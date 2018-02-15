@@ -153,7 +153,7 @@ impl Connecter {
                 let mut i: usize = 0;
                 let mut j: usize = self.dbip_v4.len()-1;
                 while i < j {
-                    println!("{} {}",i,j);
+                    //println!("{} {}",i,j);
                     let k: usize = (i+j)/2;
                     let (ip_from,ip_to,code) = self.dbip_v4[k];
                     if ip_from > *ipv4 {
