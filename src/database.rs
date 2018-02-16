@@ -40,15 +40,17 @@ impl Database {
                 for (k,v) in section.iter() { 
                     println!("NODE  {}:{}", *k, *v);
                     let nodename: &str = &v.to_string();
+                    let id = k.to_string();
+                    let id = u8::from_str(&id).unwrap();
                     match config.section(Some(nodename)) {
                         Some(ref node_section) => {
-                            println!("{:?}",node_section);
-                            let id = k.to_string();
-                            let id = u8::from_str(&id).unwrap();
                             let new_node = Node {
                                 id,
                                 name: nodename.to_string()
                             };
+                            for (k,v) in node_section.iter() { 
+                                println!("NODESECTION  {}:{}", *k, *v);
+                            }
                             self.nodes[id as usize] = Some(new_node)
                         },
                         None => return Err("Cannot find node section")
