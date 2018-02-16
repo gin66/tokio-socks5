@@ -5,7 +5,7 @@ use std::str::FromStr;
 use std::option::Option;
 use std::net::{SocketAddr};
 use ini;
-use country::country_hash;
+use country::{country_hash,MAX_COUNTRY_HASH};
 
 pub struct Node {
     id: u8,
@@ -17,7 +17,8 @@ pub struct Node {
 
 pub struct Database {
     nodes: Vec<Option<Node>>,
-    proxy_to: Vec<Option<Vec<SocketAddr>>>
+    proxy_to: Vec<Option<Vec<SocketAddr>>>,
+    country_to_nodes: Vec<Option<Vec<u8>>>
 }
 
 #[allow(dead_code)]
@@ -25,11 +26,15 @@ impl Database {
     pub fn new() -> Rc<Database> {
         let mut db = Database {
             nodes: vec!(),   // Array of Nodes set to None
-            proxy_to: vec!()
+            proxy_to: vec!(),
+            country_to_nodes: vec!()
         };
-        for i in 0..255 {
+        for _i in 0..255 {
             db.nodes.push(None);
-            db.proxy_to.push(None)
+            db.proxy_to.push(None);
+        };
+        for _i in 1..MAX_COUNTRY_HASH {
+            db.country_to_nodes.push(None);
         }
         Rc::new(db)
     }
@@ -74,9 +79,15 @@ impl Database {
                                         let country = v.to_string().to_lowercase().into_bytes();
                                         let code = country_hash(&[country[0],country[1]]);
                                         if let Some(ch) = code {
-                                            new_node.country_code = Some(ch)
+                                            new_node.country_code = Some(ch);
+                                            if None == self.country_to_nodes[ch] {
+                                                self.country_to_nodes[ch] = Some(vec!(id))
+                                            }
+                                            if let Some(ref mut id_list) = self.country_to_nodes[ch] {
+                                                id_list.push(id)
+                                            }
                                         }
-                                    }
+                                    },
                                     _ if k.contains("SocksProxy->") => {
                                         let to_id = k[12..].to_string();
                                         let to_id = u8::from_str(&to_id).unwrap();
@@ -86,6 +97,7 @@ impl Database {
                                             match add.parse::<SocketAddr>() {
                                                 Err(e) => return Err("SocksProxy Address is wrong"),
                                                 Ok(sa) => {
+                                                    //println!("Node {} -> {:?}",to_id,&sa);
                                                     sa_list.push(sa)
                                                 }
                                             }    
