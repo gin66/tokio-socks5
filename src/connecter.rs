@@ -99,7 +99,7 @@ impl Connecter {
         }
     }
 
-    fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> Vec<&SocketAddr> {
+    fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> Vec<SocketAddr> {
         let mut id_list: Vec<u8> = vec!();
         for cx in codes {
             if let Some(ref xid_list) = self.database.country_to_nodes[*cx as usize] {
@@ -110,11 +110,11 @@ impl Connecter {
                 }
             }
         }
-        let mut sa_list: Vec<&SocketAddr> = vec!();
+        let mut sa_list: Vec<SocketAddr> = vec!();
         for id in id_list {
             if let Some(ref proxies) = self.database.proxy_to[id as usize] {
                 for sa in proxies {
-                    sa_list.push(sa)
+                    sa_list.push(sa.clone())
                 }
             }
         }
@@ -129,6 +129,7 @@ enum State {
     Resolve(LookupIpFuture),
     AnalyzeIps(Vec<IpAddr>),
     SelectProxy(Vec<usize>),
+    NextProxy,
     Connecting(TcpStreamNew),
     WaitHandshake(socks_fut::SocksConnectHandshake)
 }
@@ -139,7 +140,8 @@ pub struct ConnecterFuture {
     connecter: Rc<Connecter>,
     request: Bytes,
     source: Rc<TcpStream>,
-    start: Option<Instant>
+    start: Option<Instant>,
+    sa_list: Option<Vec<SocketAddr>>
 }
 
 impl Connecter {
@@ -182,7 +184,8 @@ impl Connecter {
             connecter: conn,
             request,
             source,
-            start: None
+            start: None,
+            sa_list: None
         }
     }
 }
@@ -228,14 +231,24 @@ impl Future for ConnecterFuture {
                 },
                 State::SelectProxy(ref codes) => {
                     let mut sa_list = self.connecter.select_proxy(codes);
-                    let sa = sa_list.pop();
-                    match sa {
-                        Some(ref sa) => {
-                            println!("Use proxy @ {:?}",*sa);
-                            State::Connecting(TcpStream::connect(&sa,&self.handle))
+                    self.sa_list = Some(sa_list);
+                    State::NextProxy
+                }
+                State::NextProxy => {
+                    match self.sa_list {
+                        Some(ref mut sa_list) => {
+                            let sa = sa_list.pop();
+                            match sa {
+                                Some(ref sa) => {
+                                    println!("Use proxy @ {:?}",*sa);
+                                    State::Connecting(TcpStream::connect(&sa,&self.handle))
+                                },
+                                None =>
+                                    return Err(io::Error::new(io::ErrorKind::Other, "no (more) proxy"))
+                            }
                         },
-                        None =>
-                            return Err(io::Error::new(io::ErrorKind::Other, "no proxy"))
+                        None => 
+                            return Err(io::Error::new(io::ErrorKind::Other, "weird: no proxy list"))
                     }
                 },
                 State::Connecting(ref mut fut) => {
