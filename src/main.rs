@@ -73,7 +73,10 @@ fn main() {
     let config_file = matches.value_of("config").unwrap_or("config.ini");
     let config = Ini::load_from_file(config_file).unwrap();
     let node_id = matches.value_of("id").unwrap();
-    Rc::get_mut(&mut database).unwrap().read_from_ini(config, node_id);
+    if let Err(s) = Rc::get_mut(&mut database).unwrap().read_from_ini(config, node_id) {
+        println!("ERROR: {}",s);
+        return
+    };
 
     let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
     let addr = addr.parse::<SocketAddr>().unwrap();
