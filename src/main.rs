@@ -63,7 +63,6 @@ fn main() {
         (about: "Multi-server multi-client vpn")
         (@arg CONFIG: -c --config +takes_value   "Sets a custom config file")
         (@arg debug:  -d ...                     "Sets the level of debugging information")
-        (@arg socks:  -s --socks  +takes_value   "Listening address of socks-server <ip:port>")
         (@arg listen: -l --listen +takes_value   "Listening addresses for peers <ip:port,...>")
         (@arg peers:  -p --peers  +takes_value   "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
