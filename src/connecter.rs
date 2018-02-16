@@ -98,6 +98,16 @@ impl Connecter {
             &IpAddr::V6(ref ipv6) => None
         }
     }
+
+    fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> SocketAddr{
+        for cx in codes {
+            //self.connecter.id_list_from_country(*cx)
+        }
+        let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
+        //if let Some(id_list) = self.database.country_to_nodes(ch) {
+        //}
+        sa
+    }
 }
 
 enum State {
@@ -202,7 +212,7 @@ impl Future for ConnecterFuture {
                     State::SelectProxy(codes)
                 },
                 State::SelectProxy(ref codes) => {
-                    let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
+                    let sa = self.connecter.select_proxy(codes);
                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                 },
                 State::Connecting(ref mut fut) => {
