@@ -224,12 +224,12 @@ fn main() {
     if let Some(ref node) = database.nodes[node_id as usize] {
         if let Some(addr) = node.socks5_listen_port {
             println!("Listening for socks5 proxy connections on {:?}", addr);
-            let handle = lp.handle();
+            let handle2 = handle.clone();
             let conn = Rc::new(conn);
-            let listener = TcpListener::bind(&addr, &handle).unwrap();
-            let server = listener.incoming().for_each(|(socket, _addr)| {
+            let listener = TcpListener::bind(&addr, &handle2).unwrap();
+            let server = listener.incoming().for_each(move |(socket, _addr)| {
                 let conn2 = conn.clone();
-                handle.spawn(
+                handle2.spawn(
                     socks_fut::socks_handshake(socket)
                         .and_then(move |(source,addr,request,_port,_cmd)| {
                             println!("select best proxy for destination");
@@ -254,9 +254,14 @@ fn main() {
                         })
                 );
                 Ok(())
-            });
-            lp.run(server).unwrap();
+            })
+            .then( |_| { Ok(())});
+            handle.spawn(server)
         }
+    }
+
+    loop {
+        lp.turn(None);
     }
 }
 
