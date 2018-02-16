@@ -14,8 +14,9 @@ pub struct Node {
     probe: Option<String>,
     country_code: Option<usize>,
     pub socks5_listen_port: Option<SocketAddr>,
-    pub tcp_addresses: Option<Vec<SocketAddr>>,
-    pub udp_addresses: Option<Vec<SocketAddr>>
+    pub public_tcp: Option<Vec<SocketAddr>>,
+    pub public_udp: Option<Vec<SocketAddr>>,
+    pub bind_tcp: Option<Vec<SocketAddr>>
 }
 
 #[derive(Debug)]
@@ -67,8 +68,9 @@ impl Database {
                                 probe: None,
                                 country_code: None,
                                 socks5_listen_port: None,
-                                tcp_addresses: None,
-                                udp_addresses: None
+                                public_tcp: None,
+                                public_udp: None,
+                                bind_tcp : None
                             };
                             for (k,v) in node_section.iter() {
                                 match k.as_ref() {
@@ -81,7 +83,7 @@ impl Database {
                                             Ok(sa) => new_node.socks5_listen_port = Some(sa)
                                         }
                                     },
-                                    "TCPAddresses" => {
+                                    "PublicTCP" => {
                                         let flds = v.split(",");
                                         let mut sa_list: Vec<SocketAddr> = vec!();
                                         for add in flds {
@@ -91,10 +93,23 @@ impl Database {
                                             }
                                         }
                                         if sa_list.len() > 0 {
-                                            new_node.tcp_addresses = Some(sa_list)
+                                            new_node.public_tcp = Some(sa_list)
                                         }
                                     },
-                                    "UDPAddresses" => {
+                                    "BindTCP" => {
+                                        let flds = v.split(",");
+                                        let mut sa_list: Vec<SocketAddr> = vec!();
+                                        for add in flds {
+                                            match add.parse::<SocketAddr>() {
+                                                Err(e) => return Err("TCPAddress is wrong"),
+                                                Ok(sa) => sa_list.push(sa)
+                                            }
+                                        }
+                                        if sa_list.len() > 0 {
+                                            new_node.bind_tcp = Some(sa_list)
+                                        }
+                                    },
+                                    "PublicUDP" => {
                                         let flds = v.split(",");
                                         let mut sa_list: Vec<SocketAddr> = vec!();
                                         for add in flds {
@@ -104,7 +119,7 @@ impl Database {
                                             }
                                         }
                                         if sa_list.len() > 0 {
-                                            new_node.udp_addresses = Some(sa_list)
+                                            new_node.public_udp = Some(sa_list)
                                         }
                                     },
                                     "Country" if v.len() == 2 => {
