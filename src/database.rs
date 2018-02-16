@@ -13,7 +13,9 @@ pub struct Node {
     name: String,
     probe: Option<String>,
     country_code: Option<usize>,
-    pub socks5_listen_port: Option<SocketAddr>
+    pub socks5_listen_port: Option<SocketAddr>,
+    pub tcp_addresses: Option<Vec<SocketAddr>>,
+    pub udp_addresses: Option<Vec<SocketAddr>>
 }
 
 #[derive(Debug)]
@@ -64,7 +66,9 @@ impl Database {
                                 name: nodename.to_string(),
                                 probe: None,
                                 country_code: None,
-                                socks5_listen_port: None
+                                socks5_listen_port: None,
+                                tcp_addresses: None,
+                                udp_addresses: None
                             };
                             for (k,v) in node_section.iter() {
                                 match k.as_ref() {
@@ -75,6 +79,32 @@ impl Database {
                                         match v.to_string().parse::<SocketAddr>() {
                                             Err(e) => return Err("Socks5Address is wrong"),
                                             Ok(sa) => new_node.socks5_listen_port = Some(sa)
+                                        }
+                                    },
+                                    "TCPAddresses" => {
+                                        let flds = v.split(",");
+                                        let mut sa_list: Vec<SocketAddr> = vec!();
+                                        for add in flds {
+                                            match add.parse::<SocketAddr>() {
+                                                Err(e) => return Err("TCPAddress is wrong"),
+                                                Ok(sa) => sa_list.push(sa)
+                                            }
+                                        }
+                                        if sa_list.len() > 0 {
+                                            new_node.tcp_addresses = Some(sa_list)
+                                        }
+                                    },
+                                    "UDPAddresses" => {
+                                        let flds = v.split(",");
+                                        let mut sa_list: Vec<SocketAddr> = vec!();
+                                        for add in flds {
+                                            match add.parse::<SocketAddr>() {
+                                                Err(e) => return Err("UDPAddress is wrong"),
+                                                Ok(sa) => sa_list.push(sa)
+                                            }
+                                        }
+                                        if sa_list.len() > 0 {
+                                            new_node.udp_addresses = Some(sa_list)
                                         }
                                     },
                                     "Country" if v.len() == 2 => {
