@@ -3,7 +3,7 @@ use std::io::{self,Write};
 use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use futures::{Future, Async};
 use tokio_core::net::{TcpStream,TcpStreamNew};
@@ -14,23 +14,26 @@ use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socks_fut;
 use csv;
 use bytes::Bytes;
+use database::Database;
 use country::{code2country,country_hash};
 
 pub struct Connecter {
     dbip_v4: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
     resolver: ResolverFuture,
-    handle: Handle
+    handle: Handle,
+    database: Rc<Database>
 }
 
 impl Connecter {
-    pub fn new(handle: Handle) -> Connecter {
+    pub fn new(handle: Handle,database: Rc<Database>) -> Connecter {
         let resolver = ResolverFuture::new(ResolverConfig::default(),
                                         ResolverOpts::default(), 
                                         &handle);
         Connecter {
             dbip_v4: vec!(),
             resolver,
-            handle
+            handle,
+            database
         }
     }
 

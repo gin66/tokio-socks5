@@ -38,6 +38,7 @@ mod transfer;
 mod socks_fut;
 mod country;
 mod connecter;
+mod database;
 
 //
 // The following streams/futures are executed:
@@ -66,6 +67,8 @@ fn main() {
         (@arg peers:  -p --peers  +takes_value   "List of known peer servers <ip:port,...>")
         (@arg id: -i --id +takes_value +required "Unique ID of this instance <id>=0..255")
     ).get_matches();
+
+    let database = database::Database::new();
 
     let config_file = matches.value_of("config").unwrap_or("config.ini");
     let config = Ini::load_from_file(config_file).unwrap();
@@ -130,7 +133,7 @@ fn main() {
     let handle = lp.handle();
     let listener = TcpListener::bind(&addr, &handle).unwrap();
 
-    let mut conn = connecter::Connecter::new(handle.clone());
+    let mut conn = connecter::Connecter::new(handle.clone(),database.clone());
     conn.read_dbip();
 
     if false {
