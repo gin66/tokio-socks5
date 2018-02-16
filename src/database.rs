@@ -7,6 +7,7 @@ use std::net::{SocketAddr};
 use ini;
 use country::{country_hash,MAX_COUNTRY_HASH};
 
+#[derive(Debug)]
 pub struct Node {
     id: u8,
     name: String,
@@ -15,6 +16,7 @@ pub struct Node {
     socks5_listen_port: Option<SocketAddr>
 }
 
+#[derive(Debug)]
 pub struct Database {
     nodes: Vec<Option<Node>>,
     proxy_to: Vec<Option<Vec<SocketAddr>>>,
@@ -81,7 +83,7 @@ impl Database {
                                         if let Some(ch) = code {
                                             new_node.country_code = Some(ch);
                                             if None == self.country_to_nodes[ch] {
-                                                self.country_to_nodes[ch] = Some(vec!(id))
+                                                self.country_to_nodes[ch] = Some(vec!())
                                             }
                                             if let Some(ref mut id_list) = self.country_to_nodes[ch] {
                                                 id_list.push(id)
@@ -130,7 +132,7 @@ impl Database {
             Some(section) => section,
             None => return Err("No section for node {} in config-file")
         };
-        println!("{:?}",nodeconfig);
+        println!("{:?}",self);
 
         Ok(())
     }
