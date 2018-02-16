@@ -99,7 +99,7 @@ impl Connecter {
         }
     }
 
-    fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> SocketAddr{
+    fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> Vec<&SocketAddr> {
         let mut id_list: Vec<u8> = vec!();
         for cx in codes {
             if let Some(ref xid_list) = self.database.country_to_nodes[*cx as usize] {
@@ -118,9 +118,10 @@ impl Connecter {
                 }
             }
         }
-        println!("{:?}",sa_list);
-        let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
-        sa
+        //println!("{:?}",sa_list);
+        //let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
+        //sa
+        return sa_list
     }
 }
 
@@ -226,7 +227,8 @@ impl Future for ConnecterFuture {
                     State::SelectProxy(codes)
                 },
                 State::SelectProxy(ref codes) => {
-                    let sa = self.connecter.select_proxy(codes);
+                    let sa_list = self.connecter.select_proxy(codes);
+                    let sa = sa_list[0];
                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                 },
                 State::Connecting(ref mut fut) => {
