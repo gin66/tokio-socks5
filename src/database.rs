@@ -3,6 +3,7 @@
 use std::rc::Rc;
 use std::str::FromStr;
 use std::option::Option;
+use std::net::{SocketAddr};
 use ini;
 use country::country_hash;
 
@@ -10,7 +11,8 @@ pub struct Node {
     id: u8,
     name: String,
     probe: Option<String>,
-    country_code: Option<usize>
+    country_code: Option<usize>,
+    socks5_listen_port: Option<SocketAddr>
 }
 
 pub struct Database {
@@ -51,7 +53,8 @@ impl Database {
                                 id,
                                 name: nodename.to_string(),
                                 probe: None,
-                                country_code: None
+                                country_code: None,
+                                socks5_listen_port: None
                             };
                             for (k,v) in node_section.iter() { 
                                 if k == "Probe" {
@@ -62,6 +65,12 @@ impl Database {
                                     let code = country_hash(&[country[0],country[1]]);
                                     if let Some(ch) = code {
                                         new_node.country_code = Some(ch)
+                                    }
+                                }
+                                else if k == "Socks5Address" {
+                                    match v.to_string().parse::<SocketAddr>() {
+                                        Err(e) => return Err("Socks5Address is wrong"),
+                                        Ok(sa) => new_node.socks5_listen_port = Some(sa)
                                     }
                                 }
                                 else {
