@@ -227,9 +227,16 @@ impl Future for ConnecterFuture {
                     State::SelectProxy(codes)
                 },
                 State::SelectProxy(ref codes) => {
-                    let sa_list = self.connecter.select_proxy(codes);
-                    let sa = sa_list[0];
-                    State::Connecting(TcpStream::connect(&sa,&self.handle))
+                    let mut sa_list = self.connecter.select_proxy(codes);
+                    let sa = sa_list.pop();
+                    match sa {
+                        Some(ref sa) => {
+                            println!("Use proxy @ {:?}",*sa);
+                            State::Connecting(TcpStream::connect(&sa,&self.handle))
+                        },
+                        None =>
+                            return Err(io::Error::new(io::ErrorKind::Other, "no proxy"))
+                    }
                 },
                 State::Connecting(ref mut fut) => {
                     let proxy = try_ready!(fut.poll());
