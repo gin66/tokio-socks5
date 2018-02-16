@@ -252,9 +252,14 @@ impl Future for ConnecterFuture {
                     }
                 },
                 State::Connecting(ref mut fut) => {
-                    let proxy = try_ready!(fut.poll());
-                    self.start = Some(Instant::now());
-                    State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
+                    match fut.poll() {
+                        Ok(Async::Ready(proxy)) => {
+                            self.start = Some(Instant::now());
+                            State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
+                        },
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Err(_e) => State::NextProxy
+                    }
                 },
                 State::WaitHandshake(ref mut fut) => {
                     // Trick from Transfer: Make sure we can write the response !
