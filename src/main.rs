@@ -36,7 +36,7 @@ use ini::Ini;
 mod message;
 mod transfer;
 mod socks_fut;
-//mod resolver;
+mod country;
 mod connecter;
 
 //
