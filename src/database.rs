@@ -13,12 +13,12 @@ pub struct Node {
     name: String,
     probe: Option<String>,
     country_code: Option<usize>,
-    socks5_listen_port: Option<SocketAddr>
+    pub socks5_listen_port: Option<SocketAddr>
 }
 
 #[derive(Debug)]
 pub struct Database {
-    nodes: Vec<Option<Node>>,
+    pub nodes: Vec<Option<Node>>,
     proxy_to: Vec<Option<Vec<SocketAddr>>>,
     country_to_nodes: Vec<Option<Vec<u8>>>
 }
@@ -41,7 +41,7 @@ impl Database {
         Rc::new(db)
     }
 
-    pub fn read_from_ini(&mut self, config: ini::Ini, node_id: &str) -> Result<(),(&str)> {
+    pub fn read_from_ini(&mut self, config: ini::Ini) -> Result<(),(&str)> {
         // Print parsed config file for debugging
         for (sec, prop) in config.iter() {
             println!("Section: {:?}", *sec);
@@ -121,19 +121,6 @@ impl Database {
             },
             None => return Err("No [Nodes] section config-file")
         };
-
-        let nodename = match config.get_from(Some("Nodes"), node_id) {
-            Some(name) => name,
-            None => return Err("Node is not defined in config-file")
-        };
-        println!("This node is {} with name {}",node_id,nodename);
-
-        let nodeconfig = match config.section(Some(nodename)) { 
-            Some(section) => section,
-            None => return Err("No section for node {} in config-file")
-        };
-        println!("{:?}",self);
-
         Ok(())
     }
 }

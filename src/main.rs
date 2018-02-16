@@ -14,6 +14,7 @@ extern crate ini;
 extern crate bytes;
 extern crate csv;
 
+use std::str::FromStr;
 use std::cell::RefCell;
 //use std::io::{self, Read, Write};
 //use std::net::{Shutdown, IpAddr};
@@ -72,14 +73,13 @@ fn main() {
 
     let config_file = matches.value_of("config").unwrap_or("config.ini");
     let config = Ini::load_from_file(config_file).unwrap();
-    let node_id = matches.value_of("id").unwrap();
-    if let Err(s) = Rc::get_mut(&mut database).unwrap().read_from_ini(config, node_id) {
+    if let Err(s) = Rc::get_mut(&mut database).unwrap().read_from_ini(config) {
         println!("ERROR: {}",s);
         return
     };
 
-    let addr = matches.value_of("socks").unwrap_or("127.0.0.1:8080");
-    let addr = addr.parse::<SocketAddr>().unwrap();
+    let node_id = matches.value_of("id").unwrap();
+    let node_id = u8::from_str(&node_id).unwrap();
 
     let mut peer_list: Vec<SocketAddr> = Vec::new();
     if let Some(peers) = matches.value_of("peers") {
@@ -111,7 +111,6 @@ fn main() {
     let mut lp = Core::new().unwrap();
     //let buffer = Rc::new(RefCell::new(vec![0; 64 * 1024]));
     let handle = lp.handle();
-    let listener = TcpListener::bind(&addr, &handle).unwrap();
 
     let mut conn = connecter::Connecter::new(handle.clone(),database.clone());
     conn.read_dbip();
@@ -222,43 +221,42 @@ fn main() {
     // future representing the completion of handling that client. This future
     // itself is then *spawned* onto the event loop to ensure that it can
     // progress concurrently with all other connections.
-    println!("Listening for socks5 proxy connections on {}", addr);
-    let handle = lp.handle();
-    let conn = Rc::new(conn);
-    let server = listener.incoming().for_each(|(socket, _addr)| {
-        let conn2 = conn.clone();
-        handle.spawn(
-            socks_fut::socks_handshake(socket)
-                .and_then(move |(source,addr,request,_port,_cmd)| {
-                    println!("select best proxy for destination");
-                    let request = request.freeze();
-                    let source  = Rc::new(source);
-                    conn2.resolve_connect(conn2.clone(),source.clone(),&addr,request.clone())
-                        .and_then(|dest|{
-                            let c1 = source;
-                            let c2 = Rc::new(dest);
+    if let Some(ref node) = database.nodes[node_id as usize] {
+        if let Some(addr) = node.socks5_listen_port {
+            println!("Listening for socks5 proxy connections on {:?}", addr);
+            let handle = lp.handle();
+            let conn = Rc::new(conn);
+            let listener = TcpListener::bind(&addr, &handle).unwrap();
+            let server = listener.incoming().for_each(|(socket, _addr)| {
+                let conn2 = conn.clone();
+                handle.spawn(
+                    socks_fut::socks_handshake(socket)
+                        .and_then(move |(source,addr,request,_port,_cmd)| {
+                            println!("select best proxy for destination");
+                            let request = request.freeze();
+                            let source  = Rc::new(source);
+                            conn2.resolve_connect(conn2.clone(),source.clone(),&addr,request.clone())
+                                .and_then(|dest|{
+                                    let c1 = source;
+                                    let c2 = Rc::new(dest);
 
-                            let half1 = transfer::Transfer::new(c1.clone(), c2.clone());
-                            let half2 = transfer::Transfer::new(c2, c1);
-                            half1.join(half2)
+                                    let half1 = transfer::Transfer::new(c1.clone(), c2.clone());
+                                    let half2 = transfer::Transfer::new(c2, c1);
+                                    half1.join(half2)
+                                })
                         })
-                })
-                .then( |res| { 
-                    match res {
-                        Ok(_)  => println!("both connected"),
-                        Err(e) => println!("{:?}",e)
-                    };
-                    Ok(())
-                })
-        );
-        Ok(())
-    });
-
-    // Now that we've got our server as a future ready to go, let's run it!
-    //
-    // This `run` method will return the resolution of the future itself, but
-    // our `server` futures will resolve to `io::Result<()>`, so we just want to
-    // assert that it didn't hit an error.
-    lp.run(server).unwrap();
+                        .then( |res| { 
+                            match res {
+                                Ok(_)  => println!("both connected"),
+                                Err(e) => println!("{:?}",e)
+                            };
+                            Ok(())
+                        })
+                );
+                Ok(())
+            });
+            lp.run(server).unwrap();
+        }
+    }
 }
 
