@@ -2,6 +2,9 @@
 use std::option::Option;
 
 #[allow(dead_code)]
+pub const MAX_COUNTRY_HASH: usize = 320;
+
+#[allow(dead_code)]
 const COUNTRY: &str = "mmsmcmgbbssbmasccgmtgsggtmpsamncatclbgpmkmlsttngagisnpalckptkgnaimvcitla\
                        esknltfmdmusinilkecnfkrsvgdkhtvaumfieglrughnzmhkidjpgetreerwslvnuafjmzad\
                        zzwfomytdebarobthuyebliqaxkzbviobnebjocvuzbfrcdobhrsjeplucobirsopnocfbos\
