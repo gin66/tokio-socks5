@@ -100,12 +100,26 @@ impl Connecter {
     }
 
     fn select_proxy(self: &Connecter, codes: &Vec<usize>) -> SocketAddr{
+        let mut id_list: Vec<u8> = vec!();
         for cx in codes {
-            //self.connecter.id_list_from_country(*cx)
+            if let Some(ref xid_list) = self.database.country_to_nodes[*cx as usize] {
+                for id in xid_list {
+                    if ! id_list.contains(id) {
+                        id_list.push(*id)
+                    }
+                }
+            }
         }
+        let mut sa_list: Vec<&SocketAddr> = vec!();
+        for id in id_list {
+            if let Some(ref proxies) = self.database.proxy_to[id as usize] {
+                for sa in proxies {
+                    sa_list.push(sa)
+                }
+            }
+        }
+        println!("{:?}",sa_list);
         let sa = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 40002);
-        //if let Some(id_list) = self.database.country_to_nodes(ch) {
-        //}
         sa
     }
 }

@@ -19,8 +19,8 @@ pub struct Node {
 #[derive(Debug)]
 pub struct Database {
     pub nodes: Vec<Option<Node>>,
-    proxy_to: Vec<Option<Vec<SocketAddr>>>,
-    country_to_nodes: Vec<Option<Vec<u8>>>
+    pub proxy_to: Vec<Option<Vec<SocketAddr>>>,
+    pub country_to_nodes: Vec<Option<Vec<u8>>>
 }
 
 #[allow(dead_code)]
