@@ -4,10 +4,13 @@ use std::rc::Rc;
 use std::str::FromStr;
 use std::option::Option;
 use ini;
+use country::country_hash;
 
 pub struct Node {
     id: u8,
-    name: String
+    name: String,
+    probe: Option<String>,
+    country_code: Option<usize>
 }
 
 pub struct Database {
@@ -44,12 +47,26 @@ impl Database {
                     let id = u8::from_str(&id).unwrap();
                     match config.section(Some(nodename)) {
                         Some(ref node_section) => {
-                            let new_node = Node {
+                            let mut new_node = Node {
                                 id,
-                                name: nodename.to_string()
+                                name: nodename.to_string(),
+                                probe: None,
+                                country_code: None
                             };
                             for (k,v) in node_section.iter() { 
-                                println!("NODESECTION  {}:{}", *k, *v);
+                                if k == "Probe" {
+                                    new_node.probe = Some(v.to_string())
+                                }
+                                else if (k == "Country") && (v.len() == 2) {
+                                    let country = v.to_string().to_lowercase().into_bytes();
+                                    let code = country_hash(&[country[0],country[1]]);
+                                    if let Some(ch) = code {
+                                        new_node.country_code = Some(ch)
+                                    }
+                                }
+                                else {
+                                    println!("UNKNOWN NODESECTION  {}:{}", *k, *v);
+                                }
                             }
                             self.nodes[id as usize] = Some(new_node)
                         },
