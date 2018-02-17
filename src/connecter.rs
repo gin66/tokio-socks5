@@ -11,7 +11,7 @@ use tokio_core::reactor::Handle;
 use trust_dns_resolver::config::*;
 use trust_dns_resolver::ResolverFuture;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
-use socks_fut;
+use socksv5_future::*;
 use csv;
 use bytes::Bytes;
 use database::Database;
@@ -131,7 +131,7 @@ enum State {
     SelectProxy(Vec<usize>),
     NextProxy,
     Connecting(TcpStreamNew),
-    WaitHandshake(socks_fut::SocksConnectHandshake)
+    WaitHandshake(SocksConnectHandshake)
 }
 
 pub struct ConnecterFuture {
@@ -147,10 +147,10 @@ pub struct ConnecterFuture {
 impl Connecter {
     pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
                         source: Rc<TcpStream>,
-                        addr: &socks_fut::Addr,
+                        addr: &Addr,
                         request: Bytes) -> ConnecterFuture {
         let state = match *addr {
-            socks_fut::Addr::DOMAIN(ref host) => {
+            Addr::DOMAIN(ref host) => {
                 let hlen = host.len();
                 let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
                         // possible country code
@@ -173,7 +173,7 @@ impl Connecter {
                     }
                 }
             },
-            socks_fut::Addr::IP(ref ip) => {
+            Addr::IP(ref ip) => {
                 let ips = vec!(*ip);
                 State::AnalyzeIps(ips)
             }
@@ -255,7 +255,7 @@ impl Future for ConnecterFuture {
                     match fut.poll() {
                         Ok(Async::Ready(proxy)) => {
                             self.start = Some(Instant::now());
-                            State::WaitHandshake(socks_fut::socks_connect_handshake(proxy,self.request.clone()))
+                            State::WaitHandshake(socks_connect_handshake(proxy,self.request.clone()))
                         },
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(_e) => State::NextProxy

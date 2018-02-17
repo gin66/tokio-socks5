@@ -13,6 +13,7 @@ extern crate clap;
 extern crate ini;
 extern crate bytes;
 extern crate csv;
+extern crate socksv5_future;
 
 use std::str::FromStr;
 use std::cell::RefCell;
@@ -33,10 +34,10 @@ use futures::stream::{SplitSink,SplitStream};
 use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
 use ini::Ini;
+use socksv5_future::socks_handshake;
 
 mod message;
 mod transfer;
-mod socks_fut;
 mod country;
 mod connecter;
 mod database;
@@ -229,7 +230,7 @@ fn main() {
             let server = listener.incoming().for_each(move |(socket, _addr)| {
                 let conn2 = conn.clone();
                 handle2.spawn(
-                    socks_fut::socks_handshake(socket)
+                    socks_handshake(socket)
                         .and_then(move |(source,addr,request,_port,_cmd)| {
                             println!("select best proxy for destination");
                             let request = request.freeze();

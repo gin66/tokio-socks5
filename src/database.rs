@@ -46,10 +46,12 @@ impl Database {
 
     pub fn read_from_ini(&mut self, config: ini::Ini) -> Result<(),(&str)> {
         // Print parsed config file for debugging
-        for (sec, prop) in config.iter() {
-            println!("Section: {:?}", *sec);
-            for (k, v) in prop.iter() {
-                println!("   {}:{}", *k, *v);
+        if false {
+            for (sec, prop) in config.iter() {
+                println!("Section: {:?}", *sec);
+                for (k, v) in prop.iter() {
+                    println!("   {}:{}", *k, *v);
+                }
             }
         }
 
