@@ -305,7 +305,7 @@ impl Future for ConnecterFuture {
                     println!("Time for connection {:?} ms",dt);
                     // Here can measure the round trip until remote socks server
                     // reports success - still that server can cheat for connect to final destination.
-                    let mut source = mem::replace(&mut self.source, None);
+                    let source = mem::replace(&mut self.source, None);
                     let mut source = source.unwrap();
                     let m = try!(source.write(&response.bytes.to_vec()));
                     assert_eq!(response.bytes.len(), m);
