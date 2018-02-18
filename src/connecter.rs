@@ -4,8 +4,9 @@ use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
 use std::time::Instant;
+use std::mem;
 
-use futures::{Future, Async};
+use futures::{Future, Async, Join};
 use tokio_core::net::{TcpStream,TcpStreamNew};
 use tokio_core::reactor::Handle;
 use trust_dns_resolver::config::*;
@@ -15,6 +16,7 @@ use socksv5_future::*;
 use csv;
 use database::Database;
 use country::{code2country,country_hash};
+use transfer::Transfer;
 
 pub struct Connecter {
     dbip_v4: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
@@ -41,7 +43,7 @@ impl Connecter {
         let mut rdr = csv::Reader::from_path("dbip-country-2017-12.csv").unwrap();
         for result in rdr.records() {
             match result {
-                Err(err) => (),
+                Err(_err) => (),
                 Ok(record) => {
                     if let (Some(ip_from),Some(ip_to),Some(country)) = (record.get(0),record.get(1),record.get(2)) {
                         let lcountry = country.to_lowercase();
@@ -125,68 +127,38 @@ impl Connecter {
 }
 
 enum State {
+    WaitSocksHandshake(SocksHandshake),
     Resolve(LookupIpFuture),
     AnalyzeIps(Vec<IpAddr>),
     SelectProxy(Vec<usize>),
     NextProxy,
     Connecting(TcpStreamNew),
-    WaitHandshake(SocksConnectHandshake)
+    WaitHandshake(SocksConnectHandshake),
+    WaitTransfer(Join<Transfer,Transfer>)
 }
 
 pub struct ConnecterFuture {
     handle: Handle,
     state: State,
     connecter: Rc<Connecter>,
-    request: SocksRequestResponse,
-    source: Rc<TcpStream>,
+    request: Option<SocksRequestResponse>,
+    source: Option<TcpStream>,
     start: Option<Instant>,
     sa_list: Option<Vec<SocketAddr>>
 }
 
 impl Connecter {
     pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
-                        source: Rc<TcpStream>,
-                        request: SocksRequestResponse) -> ConnecterFuture {
-        let state = match request.ipaddr() {
-            Some(ip) => {
-                let ips = vec!(ip);
-                State::AnalyzeIps(ips)
-            },
-            None => {
-                match request.hostname() {
-                    Some(ref host) => {
-                        let hlen = host.len();
-                        let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
-                                // possible country code
-                                country_hash(&[host[hlen-2],host[hlen-1]])
-                            }
-                            else {
-                                None
-                            };
-                        match ccode {
-                            None => {
-                                let mut host = host.to_vec();
-                                host.push(b'.');
-                                let host = String::from_utf8(host).unwrap();
-                                State::Resolve(self.resolver.lookup_ip(&host))
-                            },
-                            Some(code) => {
-                                println!("found country code {}",code2country(code));
-                                let codes: Vec<usize> = vec!(code);
-                                State::SelectProxy(codes)
-                            }
-                        }
-                    },
-                    None => panic!()
-                }
-            }
-        };
+                        source: TcpStream) -> ConnecterFuture {
+        let state = State::WaitSocksHandshake(
+            socks_handshake(source)
+        );
         ConnecterFuture {
             handle: self.handle.clone(),
-            state,
             connecter: conn,
-            request,
-            source,
+            request: None,
+            state: state,
+            source: None,
             start: None,
             sa_list: None
         }
@@ -200,12 +172,53 @@ impl Connecter {
 //   3. country(IP)
 //
 impl Future for ConnecterFuture {
-    type Item = TcpStream;
+    type Item = ();
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, io::Error> {
         loop {
             self.state = match self.state {
+                State::WaitSocksHandshake(ref mut fut) => {
+                    let (source,request) = try_ready!(fut.poll());
+                    self.source = Some(source);
+                    let ip_res  = request.ipaddr();
+                    let host_res = request.hostname();
+                    self.request = Some(request.clone());
+                    match ip_res {
+                        Some(ip) => {
+                            let ips = vec!(ip);
+                            State::AnalyzeIps(ips)
+                        },
+                        None => {
+                            match host_res {
+                                Some(ref host) => {
+                                    let hlen = host.len();
+                                    let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
+                                            // possible country code
+                                            country_hash(&[host[hlen-2],host[hlen-1]])
+                                        }
+                                        else {
+                                            None
+                                        };
+                                    match ccode {
+                                        None => {
+                                            let mut host = host.to_vec();
+                                            host.push(b'.');
+                                            let host = String::from_utf8(host).unwrap();
+                                            State::Resolve(self.connecter.resolver.lookup_ip(&host))
+                                        },
+                                        Some(code) => {
+                                            println!("found country code {}",code2country(code));
+                                            let codes: Vec<usize> = vec!(code);
+                                            State::SelectProxy(codes)
+                                        }
+                                    }
+                                },
+                                None => panic!()
+                            }
+                        }
+                    }
+                }
                 State::Resolve(ref mut fut) => {
                     let lookup_ip = try_ready!(fut.poll());
                     let liter = lookup_ip.iter();
@@ -233,7 +246,7 @@ impl Future for ConnecterFuture {
                     State::SelectProxy(codes)
                 },
                 State::SelectProxy(ref codes) => {
-                    let mut sa_list = self.connecter.select_proxy(codes);
+                    let sa_list = self.connecter.select_proxy(codes);
                     self.sa_list = Some(sa_list);
                     State::NextProxy
                 }
@@ -258,7 +271,11 @@ impl Future for ConnecterFuture {
                     match fut.poll() {
                         Ok(Async::Ready(proxy)) => {
                             self.start = Some(Instant::now());
-                            State::WaitHandshake(socks_connect_handshake(proxy,self.request.clone()))
+                            let request = match self.request {
+                                Some(ref req) => req.clone(),
+                                None => panic!()
+                            };
+                            State::WaitHandshake(socks_connect_handshake(proxy,request))
                         },
                         Ok(Async::NotReady) => return Ok(Async::NotReady),
                         Err(_e) => State::NextProxy
@@ -267,10 +284,15 @@ impl Future for ConnecterFuture {
                 State::WaitHandshake(ref mut fut) => {
                     // Trick from Transfer: Make sure we can write the response !
                     // => This avoids storing the response somewhere.
-                    let write_ready = self.source.poll_write().is_ready();
-                    if !write_ready {
-                        return Ok(Async::NotReady)
-                    }
+                    match self.source {
+                        Some(ref source) => {
+                            let write_ready = source.poll_write().is_ready();
+                            if !write_ready {
+                                return Ok(Async::NotReady)
+                            }
+                        },
+                        None => ()
+                    };
                     let (stream,response) = try_ready!(fut.poll());
                     let dt = match self.start {
                         Some(start) => {
@@ -283,9 +305,21 @@ impl Future for ConnecterFuture {
                     println!("Time for connection {:?} ms",dt);
                     // Here can measure the round trip until remote socks server
                     // reports success - still that server can cheat for connect to final destination.
-                    let m = try!((&*self.source).write(&response.bytes.to_vec()));
+                    let mut source = mem::replace(&mut self.source, None);
+                    let mut source = source.unwrap();
+                    let m = try!(source.write(&response.bytes.to_vec()));
                     assert_eq!(response.bytes.len(), m);
-                    return Ok(Async::Ready(stream));
+
+                    let c1 = Rc::new(source);
+                    let c2 = Rc::new(stream);
+
+                    let half1 = Transfer::new(c1.clone(), c2.clone());
+                    let half2 = Transfer::new(c2, c1);
+                    State::WaitTransfer(half1.join(half2))
+                },
+                State::WaitTransfer(ref mut fut) => {
+                    let transferred = try_ready!(fut.poll());
+                    return Ok(Async::Ready(()));
                 }
             }
         }

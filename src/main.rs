@@ -33,7 +33,6 @@ use futures::stream::{SplitSink,SplitStream};
 use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
 use ini::Ini;
-use socksv5_future::socks_handshake;
 
 mod message;
 mod transfer;
@@ -229,27 +228,14 @@ fn main() {
             let server = listener.incoming().for_each(move |(socket, _addr)| {
                 let conn2 = conn.clone();
                 handle2.spawn(
-                    socks_handshake(socket)
-                        .and_then(move |(source,request)| {
-                            println!("select best proxy for destination");
-                            let source  = Rc::new(source);
-                            conn2.resolve_connect(conn2.clone(),source.clone(),request)
-                                .and_then(|dest|{
-                                    let c1 = source;
-                                    let c2 = Rc::new(dest);
-
-                                    let half1 = transfer::Transfer::new(c1.clone(), c2.clone());
-                                    let half2 = transfer::Transfer::new(c2, c1);
-                                    half1.join(half2)
-                                })
-                        })
-                        .then( |res| { 
-                            match res {
-                                Ok(_)  => println!("both connected"),
-                                Err(e) => println!("{:?}",e)
-                            };
-                            Ok(())
-                        })
+                        conn2.resolve_connect(conn2.clone(),socket)
+                            .then( |res| { 
+                                match res {
+                                    Ok(_)  => println!("both connected"),
+                                    Err(e) => println!("{:?}",e)
+                                };
+                                Ok(())
+                            })
                 );
                 Ok(())
             })
