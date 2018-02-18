@@ -110,8 +110,8 @@ fn main() {
     //let buffer = Rc::new(RefCell::new(vec![0; 64 * 1024]));
     let handle = lp.handle();
 
-    let mut conn = connecter::Connecter::new(handle.clone(),database.clone());
-    conn.read_dbip();
+    let mut connecter = connecter::Connecter::new(handle.clone(),database.clone());
+    connecter.read_dbip();
 
     if false {
         let my_id = 1;
@@ -223,19 +223,19 @@ fn main() {
         if let Some(addr) = node.socks5_listen_port {
             println!("Listening for socks5 proxy connections on {:?}", addr);
             let handle2 = handle.clone();
-            let conn = Rc::new(conn);
+            let connecter = Rc::new(connecter);
+            let conn2 = connecter;
             let listener = TcpListener::bind(&addr, &handle2).unwrap();
             let server = listener.incoming().for_each(move |(socket, _addr)| {
-                let conn2 = conn.clone();
                 handle2.spawn(
-                        conn2.resolve_connect(conn2.clone(),socket)
-                            .then( |res| { 
-                                match res {
-                                    Ok(_)  => println!("both connected"),
-                                    Err(e) => println!("{:?}",e)
-                                };
-                                Ok(())
-                            })
+                    conn2.resolve_connect(conn2.clone(),socket)
+                        .then( |res| { 
+                            match res {
+                                Ok(_)  => println!("both connected"),
+                                Err(e) => println!("{:?}",e)
+                            };
+                            Ok(())
+                        })
                 );
                 Ok(())
             })
