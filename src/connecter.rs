@@ -138,7 +138,7 @@ pub struct ConnecterFuture {
     handle: Handle,
     state: State,
     connecter: Rc<Connecter>,
-    request: Bytes,
+    request: SocksRequestResponse,
     source: Rc<TcpStream>,
     start: Option<Instant>,
     sa_list: Option<Vec<SocketAddr>>
@@ -147,35 +147,39 @@ pub struct ConnecterFuture {
 impl Connecter {
     pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
                         source: Rc<TcpStream>,
-                        addr: &Addr,
-                        request: Bytes) -> ConnecterFuture {
-        let state = match *addr {
-            Addr::DOMAIN(ref host) => {
-                let hlen = host.len();
-                let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
-                        // possible country code
-                        country_hash(&[host[hlen-2],host[hlen-1]])
-                    }
-                    else {
-                        None
-                    };
-                match ccode {
-                    None => {
-                        let mut host = host.to_vec();
-                        host.push(b'.');
-                        let host = String::from_utf8(host).unwrap();
-                        State::Resolve(self.resolver.lookup_ip(&host))
-                    },
-                    Some(code) => {
-                        println!("found country code {}",code2country(code));
-                        let codes: Vec<usize> = vec!(code);
-                        State::SelectProxy(codes)
-                    }
-                }
-            },
-            Addr::IP(ref ip) => {
-                let ips = vec!(*ip);
+                        request: SocksRequestResponse) -> ConnecterFuture {
+        let state = match request.ipaddr() {
+            Some(ip) => {
+                let ips = vec!(ip);
                 State::AnalyzeIps(ips)
+            },
+            None => {
+                match request.hostname() {
+                    Some(ref host) => {
+                        let hlen = host.len();
+                        let ccode = if (hlen > 4) && (host[hlen-3] == b'.') {
+                                // possible country code
+                                country_hash(&[host[hlen-2],host[hlen-1]])
+                            }
+                            else {
+                                None
+                            };
+                        match ccode {
+                            None => {
+                                let mut host = host.to_vec();
+                                host.push(b'.');
+                                let host = String::from_utf8(host).unwrap();
+                                State::Resolve(self.resolver.lookup_ip(&host))
+                            },
+                            Some(code) => {
+                                println!("found country code {}",code2country(code));
+                                let codes: Vec<usize> = vec!(code);
+                                State::SelectProxy(codes)
+                            }
+                        }
+                    },
+                    None => panic!()
+                }
             }
         };
         ConnecterFuture {
@@ -280,8 +284,8 @@ impl Future for ConnecterFuture {
                     println!("Time for connection {:?} ms",dt);
                     // Here can measure the round trip until remote socks server
                     // reports success - still that server can cheat for connect to final destination.
-                    let m = try!((&*self.source).write(&response.to_vec()));
-                    assert_eq!(response.len(), m);
+                    let m = try!((&*self.source).write(&response.bytes.to_vec()));
+                    assert_eq!(response.bytes.len(), m);
                     return Ok(Async::Ready(stream));
                 }
             }

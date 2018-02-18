@@ -231,11 +231,10 @@ fn main() {
                 let conn2 = conn.clone();
                 handle2.spawn(
                     socks_handshake(socket)
-                        .and_then(move |(source,addr,request,_port,_cmd)| {
+                        .and_then(move |(source,request)| {
                             println!("select best proxy for destination");
-                            let request = request.freeze();
                             let source  = Rc::new(source);
-                            conn2.resolve_connect(conn2.clone(),source.clone(),&addr,request.clone())
+                            conn2.resolve_connect(conn2.clone(),source.clone(),request)
                                 .and_then(|dest|{
                                     let c1 = source;
                                     let c2 = Rc::new(dest);
