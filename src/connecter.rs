@@ -13,7 +13,6 @@ use trust_dns_resolver::ResolverFuture;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socksv5_future::*;
 use csv;
-use bytes::Bytes;
 use database::Database;
 use country::{code2country,country_hash};
 

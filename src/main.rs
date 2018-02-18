@@ -11,7 +11,6 @@ extern crate trust_dns_resolver;
 #[macro_use]
 extern crate clap;
 extern crate ini;
-extern crate bytes;
 extern crate csv;
 extern crate socksv5_future;
 
