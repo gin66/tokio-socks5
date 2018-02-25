@@ -110,7 +110,8 @@ deploy:
     # and nightly channels. This condition makes sure there is only one release
     # for such targets and that's generated using the stable channel
     condition: $TRAVIS_RUST_VERSION = stable
-    #tags: true
+    tags: true
+    all_branches: true
   provider: releases
   skip_cleanup: true
 
@@ -118,12 +119,6 @@ cache: cargo
 before_cache:
   # Travis can't cache files that are not readable by "others"
   - chmod -R a+r $HOME/.cargo
-
-branches:
-  only:
-    # release tags
-    #- /^v\d+\.\d+\.\d+.*$/
-    - mba
 
 notifications:
   email:
