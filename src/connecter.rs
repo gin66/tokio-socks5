@@ -134,6 +134,8 @@ enum State {
     NextProxy,
     Connecting(TcpStreamNew),
     WaitHandshake(SocksConnectHandshake),
+    ConnectingDirectly(TcpStreamNew),
+    StartTransferDirect(TcpStream),
     WaitTransfer(Join<Transfer,Transfer>)
 }
 
@@ -316,6 +318,56 @@ impl Future for ConnecterFuture {
                     let half1 = Transfer::new(c1.clone(), c2.clone());
                     let half2 = Transfer::new(c2, c1);
                     State::WaitTransfer(half1.join(half2))
+                },
+                State::ConnectingDirectly(ref mut fut) => {
+                    match fut.poll() {
+                        Ok(Async::Ready(outgoing)) => {
+                            self.start = Some(Instant::now());
+                            let request = match self.request {
+                                Some(ref req) => req.clone(),
+                                None => panic!()
+                            };
+                            State::StartTransferDirect(outgoing)
+                        },
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Err(_e) => 
+                            return Err(io::Error::new(io::ErrorKind::Other, "Cannot connect directly"))
+                    }
+                },
+                State::StartTransferDirect(outgoing) => {
+                    // Trick from Transfer: Make sure we can write the response !
+                    match self.source {
+                        Some(ref source) => {
+                            let write_ready = source.poll_write().is_ready();
+                            if !write_ready {
+                                return Ok(Async::NotReady)
+                            }
+                        },
+                        None => ()
+                    };
+                    let local = outgoing.local_addr().unwrap();
+                    let x = v5::ATYP_DOMAIN;
+                    let response = match local {
+                        SocketAddr::V4(sa_v4) => {
+                            sa_v4.ip().octets()
+                        },
+                        SocketAddr::V6(sa_v6) => {
+                            sa_v6.ip().octets()
+                        }
+                    };
+
+                    let source = mem::replace(&mut self.source, None);
+                    let mut source = source.unwrap();
+                    let m = try!(source.write(&self.request.bytes.to_vec()));
+                    assert_eq!(response.bytes.len(), m);
+
+                    let c1 = Rc::new(source);
+                    let c2 = Rc::new(stream);
+
+                    let half1 = Transfer::new(c1.clone(), c2.clone());
+                    let half2 = Transfer::new(c2, c1);
+                    State::WaitTransfer(half1.join(half2))
+
                 },
                 State::WaitTransfer(ref mut fut) => {
                     let transferred = try_ready!(fut.poll());
