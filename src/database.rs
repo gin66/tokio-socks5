@@ -14,6 +14,7 @@ pub struct Node {
     probe: Option<String>,
     country_code: Option<usize>,
     pub socks5_listen_port: Option<SocketAddr>,
+    pub socks_server_ports: Option<Vec<SocketAddr>>,
     pub public_tcp: Option<Vec<SocketAddr>>,
     pub public_udp: Option<Vec<SocketAddr>>,
     pub bind_tcp: Option<Vec<SocketAddr>>
@@ -70,6 +71,7 @@ impl Database {
                                 probe: None,
                                 country_code: None,
                                 socks5_listen_port: None,
+                                socks_server_ports: None,
                                 public_tcp: None,
                                 public_udp: None,
                                 bind_tcp : None
@@ -122,6 +124,19 @@ impl Database {
                                         }
                                         if sa_list.len() > 0 {
                                             new_node.public_udp = Some(sa_list)
+                                        }
+                                    },
+                                    "SocksServerPorts" => {
+                                        let flds = v.split(",");
+                                        let mut sa_list: Vec<SocketAddr> = vec!();
+                                        for add in flds {
+                                            match add.parse::<SocketAddr>() {
+                                                Err(e) => return Err("UDPAddress is wrong"),
+                                                Ok(sa) => sa_list.push(sa)
+                                            }
+                                        }
+                                        if sa_list.len() > 0 {
+                                            new_node.socks_server_ports = Some(sa_list)
                                         }
                                     },
                                     "Country" if v.len() == 2 => {

@@ -33,6 +33,7 @@ use futures::stream::{SplitSink,SplitStream};
 use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
 use ini::Ini;
+use socksv5_future::socks_handshake;
 
 mod message;
 mod transfer;
@@ -210,16 +211,16 @@ fn main() {
         }
     }
 
-    // Construct a future representing our server. This future processes all
-    // incoming connections and spawns a new task for each client which will do
-    // the proxy work.
-    //
-    // This essentially means that for all incoming connections, those received
-    // from `listener`, we'll create an instance of `Client` and convert it to a
-    // future representing the completion of handling that client. This future
-    // itself is then *spawned* onto the event loop to ensure that it can
-    // progress concurrently with all other connections.
     if let Some(ref node) = database.nodes[node_id as usize] {
+        // Construct a future representing our server. This future processes all
+        // incoming connections and spawns a new task for each client which will do
+        // the proxy work.
+        //
+        // This essentially means that for all incoming connections, those received
+        // from `listener`, we'll create an instance of `Client` and convert it to a
+        // future representing the completion of handling that client. This future
+        // itself is then *spawned* onto the event loop to ensure that it can
+        // progress concurrently with all other connections.
         if let Some(addr) = node.socks5_listen_port {
             println!("Listening for socks5 proxy connections on {:?}", addr);
             let handle2 = handle.clone();
@@ -242,7 +243,33 @@ fn main() {
             .then( |_| { Ok(())});
             handle.spawn(server)
         }
+
+        if let Some(ref vec_addr) = node.socks_server_ports {
+            for addr in vec_addr {
+                println!("Listening for socks5 connections on {:?}", addr);
+                let handle2 = handle.clone();
+                let listener = TcpListener::bind(&addr, &handle2).unwrap();
+                let server = listener.incoming().for_each(move |(socket, _addr)| {
+                    handle2.spawn(
+                        socks_handshake(socket)
+                            .then( |res| { 
+                                match res {
+                                    Ok(srr)  => {
+                                        println!("both connected")
+                                    },
+                                    Err(e) => println!("{:?}",e)
+                                };
+                                Ok(())
+                            })
+                    );
+                    Ok(())
+                })
+                .then( |_| { Ok(())});
+                handle.spawn(server)
+            }
+        }
     }
+
 
     loop {
         lp.turn(None);
