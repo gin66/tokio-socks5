@@ -124,6 +124,10 @@ impl Connecter {
         //sa
         return sa_list
     }
+
+    pub fn lookup_ip(self: &Connecter, host: &str) -> LookupIpFuture {
+        self.resolver.lookup_ip(host)
+    }
 }
 
 enum State {
