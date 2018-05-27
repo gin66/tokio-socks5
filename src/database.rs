@@ -49,9 +49,9 @@ impl Database {
         // Print parsed config file for debugging
         if false {
             for (sec, prop) in config.iter() {
-                println!("Section: {:?}", *sec);
+                debug!("Section: {:?}", *sec);
                 for (k, v) in prop.iter() {
-                    println!("   {}:{}", *k, *v);
+                    debug!("   {}:{}", *k, *v);
                 }
             }
         }
@@ -59,7 +59,7 @@ impl Database {
         match config.section(Some("Nodes")) { 
             Some(section) =>  {
                 for (k,v) in section.iter() { 
-                    println!("NODE  {}:{}", *k, *v);
+                    debug!("NODE  {}:{}", *k, *v);
                     let nodename: &str = &v.to_string();
                     let id = k.to_string();
                     let id = u8::from_str(&id).unwrap();
@@ -171,7 +171,7 @@ impl Database {
                                         }
                                     },
                                     _ => {
-                                        println!("UNKNOWN NODESECTION  {}:{}", *k, *v);
+                                        debug!("UNKNOWN NODESECTION  {}:{}", *k, *v);
                                     }
                                 };
                             }

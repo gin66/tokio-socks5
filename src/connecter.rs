@@ -41,20 +41,20 @@ impl Future for ResolverFuture
     type Error = io::Error;
 
     fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
-        println!("Poll");
+        trace!("Poll");
         loop {
             self.state = match self.state {
                 RFState::Resolve(ref mut fut) => {
                     for ip in try_ready!(fut.poll()).iter() {
                         self.ips.push(ip);
                     }
-                    println!("{:?}",self.ips);
+                    debug!("{:?}",self.ips);
                     RFState::NextIp
                 },
                 RFState::NextIp => {
-                    println!("NextIP");
+                    debug!("NextIP");
                     if let Some(ip) = self.ips.pop() {
-                        println!("{:?}",ip);
+                        debug!("{:?}",ip);
                         let sa = SocketAddr::new(ip,self.srr.as_ref().unwrap().port());
                         RFState::Connecting(TcpStream::connect(&sa,&self.handle))
                     }
@@ -104,7 +104,7 @@ impl Future for ResolverFuture
                 }
             };
         }
-        println!("Should Not come here");
+        error!("Should Not come here");
         Ok(Async::NotReady)
     }
 }
@@ -130,7 +130,7 @@ impl Connecter {
     }
 
     pub fn read_dbip(&mut self) {
-        println!("Read dbip...");
+        trace!("Read dbip...");
         let mut rdr = csv::Reader::from_path("dbip-country-2017-12.csv").unwrap();
         for result in rdr.records() {
             match result {
@@ -153,13 +153,13 @@ impl Connecter {
                             continue
                         }
                         else {
-                            println!("Unreadable record: {:?}",record)
+                            warn!("Unreadable record: {:?}",record)
                         }
                     }
                 }
             }
         }
-        println!("Read finished");
+        trace!("Read finished");
     }
 
     fn determine_country(&self,ip: &IpAddr) -> Option<usize> {
@@ -319,7 +319,7 @@ impl Future for ConnecterFuture {
                                             State::Resolve(self.connecter.resolver.lookup_ip(&host))
                                         },
                                         Some(code) => {
-                                            println!("found country code {}",code2country(code));
+                                            debug!("found country code {}",code2country(code));
                                             let codes: Vec<usize> = vec!(code);
                                             State::SelectProxy(codes)
                                         }
@@ -348,10 +348,10 @@ impl Future for ConnecterFuture {
                                 if !(codes.contains(&code)) {
                                     codes.push(code);
                                 };
-                                println!("IP {:?} -> {:?}",ip,code2country(code))
+                                debug!("IP {:?} -> {:?}",ip,code2country(code))
                             },
                             None => 
-                                println!("IP {:?} -> unknown country",ip)
+                                debug!("IP {:?} -> unknown country",ip)
                         }
                     };
                     State::SelectProxy(codes)
@@ -359,7 +359,7 @@ impl Future for ConnecterFuture {
                 State::SelectProxy(ref codes) => {
                     let sa_list = self.connecter.select_proxy(codes);
                     self.sa_list = Some(sa_list);
-                    println!("{:?}",self.sa_list);
+                    debug!("{:?}",self.sa_list);
                     State::NextProxy
                 }
                 State::NextProxy => {
@@ -368,7 +368,7 @@ impl Future for ConnecterFuture {
                             let sa = sa_list.pop();
                             match sa {
                                 Some(ref sa) => {
-                                    println!("Use proxy @ {:?}",*sa);
+                                    debug!("Use proxy @ {:?}",*sa);
                                     State::Connecting(TcpStream::connect(&sa,&self.handle))
                                 },
                                 None =>
@@ -414,7 +414,7 @@ impl Future for ConnecterFuture {
                         },
                         None => None
                     };
-                    println!("Time for connection {:?} ms",dt);
+                    debug!("Time for connection {:?} ms",dt);
                     // Here can measure the round trip until remote socks server
                     // reports success - still that server can cheat for connect to final destination.
                     let source = self.source.take();
