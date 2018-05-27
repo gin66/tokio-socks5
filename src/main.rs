@@ -29,7 +29,6 @@ use futures::{Future, Stream, Sink};
 use futures::sync::mpsc;
 use futures::sync::mpsc::{Sender, Receiver};
 use futures::stream::{SplitSink,SplitStream};
-//use tokio_io::io::{read_exact, write_all, Window};
 use tokio_core::net::{TcpListener, UdpSocket};
 use tokio_core::reactor::{Core, Interval};
 use ini::Ini;
@@ -221,15 +220,15 @@ fn main() {
         // future representing the completion of handling that client. This future
         // itself is then *spawned* onto the event loop to ensure that it can
         // progress concurrently with all other connections.
+        let connecter = Rc::new(connecter);
         if let Some(addr) = node.socks5_listen_port {
             println!("Listening for socks5 proxy connections on {:?}", addr);
             let handle2 = handle.clone();
-            let connecter = Rc::new(connecter);
-            let conn2 = connecter;
+            let conn2 = connecter.clone();
             let listener = TcpListener::bind(&addr, &handle2).unwrap();
             let server = listener.incoming().for_each(move |(socket, _addr)| {
                 handle2.spawn(
-                    conn2.resolve_connect(conn2.clone(),socket)
+                    conn2.resolve_connect_transfer(conn2.clone(),socket)
                         .then( |res| { 
                             match res {
                                 Ok(_)  => println!("both connected"),
@@ -248,19 +247,25 @@ fn main() {
             for addr in vec_addr {
                 println!("Listening for socks5 connections on {:?}", addr);
                 let handle2 = handle.clone();
+                let conn2 = connecter.clone();
                 let listener = TcpListener::bind(&addr, &handle2).unwrap();
                 let server = listener.incoming().for_each(move |(socket, _addr)| {
+                    let c = conn2.clone();
                     handle2.spawn(
                         socks_handshake(socket)
-                            .then( |res| { 
-                                match res {
-                                    Ok(srr)  => {
-                                        println!("both connected")
-                                    },
-                                    Err(e) => println!("{:?}",e)
-                                };
-                                Ok(())
+                            .and_then(move |(stream,srr)| {
+                                c.lookup_transfer(stream, srr)
+                                 .then(|res| { 
+                                    match res {
+                                        Ok(_)  => {
+                                            println!("Done");
+                                        },
+                                        Err(e) => println!("{:?}",e)
+                                    };
+                                    Ok(())
+                                })
                             })
+                        .then( |_| { Ok(())})
                     );
                     Ok(())
                 })
@@ -275,4 +280,3 @@ fn main() {
         lp.turn(None);
     }
 }
-

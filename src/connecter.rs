@@ -4,13 +4,12 @@ use std::net::{SocketAddr,IpAddr, Ipv4Addr, Ipv6Addr};
 use std::rc::Rc;
 use std::option::Option;
 use std::time::Instant;
-use std::mem;
 
 use futures::{Future, Async, Join};
 use tokio_core::net::{TcpStream,TcpStreamNew};
 use tokio_core::reactor::Handle;
 use trust_dns_resolver::config::*;
-use trust_dns_resolver::ResolverFuture;
+use trust_dns_resolver;
 use trust_dns_resolver::lookup_ip::LookupIpFuture;
 use socksv5_future::*;
 use csv;
@@ -18,16 +17,108 @@ use database::Database;
 use country::{code2country,country_hash};
 use transfer::Transfer;
 
+enum RFState {
+    Resolve(LookupIpFuture),
+    NextIp,
+    Connecting(TcpStreamNew),
+    SendOK,
+    InitiateTransfer,
+    WaitTransfer(Join<Transfer,Transfer>)
+}
+
+pub struct ResolverFuture {
+    handle: Handle,
+    state: RFState,
+    srr: Option<SocksRequestResponse>,
+    source: Option<TcpStream>,
+    destination: Option<TcpStream>,
+    ips: Vec<IpAddr>
+}
+
+impl Future for ResolverFuture
+{
+    type Item = ();
+    type Error = io::Error;
+
+    fn poll(&mut self) -> Result<Async<Self::Item>, Self::Error> {
+        println!("Poll");
+        loop {
+            self.state = match self.state {
+                RFState::Resolve(ref mut fut) => {
+                    for ip in try_ready!(fut.poll()).iter() {
+                        self.ips.push(ip);
+                    }
+                    println!("{:?}",self.ips);
+                    RFState::NextIp
+                },
+                RFState::NextIp => {
+                    println!("NextIP");
+                    if let Some(ip) = self.ips.pop() {
+                        println!("{:?}",ip);
+                        let sa = SocketAddr::new(ip,self.srr.as_ref().unwrap().port());
+                        RFState::Connecting(TcpStream::connect(&sa,&self.handle))
+                    }
+                    else {
+                        return Err(io::Error::new(io::ErrorKind::Other, "no (more) host ip"));
+                    }
+                }
+                RFState::Connecting(ref mut fut) => {
+                    match fut.poll() {
+                        Ok(Async::Ready(destination)) => {
+                            self.destination = Some(destination);
+                            //self.start = Some(Instant::now());
+                            RFState::SendOK
+                        },
+                        Ok(Async::NotReady) => return Ok(Async::NotReady),
+                        Err(_e) => RFState::NextIp
+                    }
+                },
+                RFState::SendOK => {
+                    let mut source = self.source.as_ref().unwrap();
+                    let write_ready = source.poll_write().is_ready();
+                    if !write_ready {
+                        return Ok(Async::NotReady)
+                    }
+                    let mut response = match self.srr {
+                        Some(ref req) => req.clone(),
+                        None => panic!()
+                    };
+                    response.bytes[1] = 0;
+                    let m = try!(source.write(&response.bytes.to_vec()));
+                    assert_eq!(response.bytes.len(), m);
+                    RFState::InitiateTransfer
+                },
+                RFState::InitiateTransfer => {
+                    let mut source = self.source.take().unwrap();
+                    let mut destination = self.destination.take().unwrap();
+                    let c1 = Rc::new(source);
+                    let c2 = Rc::new(destination);
+
+                    let half1 = Transfer::new(c1.clone(), c2.clone());
+                    let half2 = Transfer::new(c2, c1);
+                    RFState::WaitTransfer(half1.join(half2))
+                }
+                RFState::WaitTransfer(ref mut fut) => {
+                    let transferred = try_ready!(fut.poll());
+                    return Ok(Async::Ready(()));
+                }
+            };
+        }
+        println!("Should Not come here");
+        Ok(Async::NotReady)
+    }
+}
+
 pub struct Connecter {
     dbip_v4: Vec<(Ipv4Addr,Ipv4Addr,usize)>,
-    resolver: ResolverFuture,
+    resolver: trust_dns_resolver::ResolverFuture,
     handle: Handle,
     database: Rc<Database>
 }
 
 impl Connecter {
     pub fn new(handle: Handle,database: Rc<Database>) -> Connecter {
-        let resolver = ResolverFuture::new(ResolverConfig::default(),
+        let resolver = trust_dns_resolver::ResolverFuture::new(ResolverConfig::default(),
                                         ResolverOpts::default(), 
                                         &handle);
         Connecter {
@@ -125,8 +216,24 @@ impl Connecter {
         return sa_list
     }
 
-    pub fn lookup_ip(self: &Connecter, host: &str) -> LookupIpFuture {
-        self.resolver.lookup_ip(host)
+    pub fn lookup_transfer(self: &Connecter, source: TcpStream, srr: SocksRequestResponse) -> ResolverFuture {
+        let (ips,state) = match srr.ipaddr() {
+                Some(ip) => (vec![ip],RFState::NextIp),
+                None => { 
+                    let mut host = srr.hostname().unwrap().to_vec();
+                    host.push(b'.');
+                    let host = String::from_utf8(host).unwrap();    
+                    (vec![],RFState::Resolve(self.resolver.lookup_ip(&host)))
+                } 
+            };
+        ResolverFuture {
+            handle: self.handle.clone(),
+            srr: Some(srr),
+            state,
+            source: Some(source),
+            destination: None,
+            ips
+        }
     }
 }
 
@@ -152,7 +259,7 @@ pub struct ConnecterFuture {
 }
 
 impl Connecter {
-    pub fn resolve_connect(self: &Connecter,conn: Rc<Connecter>,
+    pub fn resolve_connect_transfer(self: &Connecter,conn: Rc<Connecter>,
                         source: TcpStream) -> ConnecterFuture {
         let state = State::WaitSocksHandshake(
             socks_handshake(source)
@@ -252,6 +359,7 @@ impl Future for ConnecterFuture {
                 State::SelectProxy(ref codes) => {
                     let sa_list = self.connecter.select_proxy(codes);
                     self.sa_list = Some(sa_list);
+                    println!("{:?}",self.sa_list);
                     State::NextProxy
                 }
                 State::NextProxy => {
@@ -309,7 +417,7 @@ impl Future for ConnecterFuture {
                     println!("Time for connection {:?} ms",dt);
                     // Here can measure the round trip until remote socks server
                     // reports success - still that server can cheat for connect to final destination.
-                    let source = mem::replace(&mut self.source, None);
+                    let source = self.source.take();
                     let mut source = source.unwrap();
                     let m = try!(source.write(&response.bytes.to_vec()));
                     assert_eq!(response.bytes.len(), m);
