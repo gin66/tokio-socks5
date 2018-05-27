@@ -47,7 +47,7 @@ impl Database {
 
     pub fn read_from_ini(&mut self, config: ini::Ini) -> Result<(),(&str)> {
         // Print parsed config file for debugging
-        if false {
+        if true {
             for (sec, prop) in config.iter() {
                 debug!("Section: {:?}", *sec);
                 for (k, v) in prop.iter() {
@@ -181,8 +181,30 @@ impl Database {
                     }
                 };
             },
-            None => return Err("No [Nodes] section config-file")
+            None => return Err("No [Nodes] section in config-file")
         };
+        match config.section(Some("Self")) { 
+            Some(section) =>  {
+                    for (k,v) in section.iter() { 
+                        debug!("Self:  {}:{}", *k, *v);
+                        match &k[..] {
+                            "Default" => {
+                                let id = u8::from_str(v).unwrap();
+                                for i in 0..self.country_to_nodes.len() {
+                                    if self.country_to_nodes[i].is_none() {
+                                        self.country_to_nodes[i] = Some(vec![id]);
+                                    }
+                                    else {
+                                        self.country_to_nodes[i].as_mut().unwrap().push(id);
+                                    }
+                                }
+                            },
+                            _ => ()
+                        }
+                    }
+            },
+            None => return Err("No [Self] section in config-file")
+        }
         Ok(())
     }
 }

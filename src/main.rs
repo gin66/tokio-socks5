@@ -109,8 +109,10 @@ fn main() {
     set_level_for_target("hyper::proto::h1::io", LevelFilter::Warn);
     set_level_for_target("hyper::proto::h1::role", LevelFilter::Warn);
     set_level_for_target("mio::poll", LevelFilter::Warn);
+    set_level_for_target("mio::sys::unix::kqueue", LevelFilter::Warn);
     set_level_for_target("reqwest::async_impl::response", LevelFilter::Warn);
     set_level_for_target("tokio_core::reactor", LevelFilter::Warn);
+    set_level_for_target("tokio_core::reactor::timeout_token", LevelFilter::Warn);
     set_level_for_target("tokio_reactor", LevelFilter::Warn);
     set_level_for_target("tokio_reactor::background", LevelFilter::Warn);
     set_level_for_target("tokio_threadpool::builder", LevelFilter::Warn);
