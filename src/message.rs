@@ -3,6 +3,29 @@ use std::io;
 use std::net::SocketAddr;
 use tokio_core::net::UdpCodec;
 
+// The message tail is watermarked with 3*64 bits.
+// The three 64bit blocks are xored and give first half of 64bit word.
+// Second half of 64bit word is a magic number.
+// Both halfs are hashed to 128 bits.
+// The hash first and second 64 bits are xored and yield the third 64 bits.
+// This construction gives the watermark, which xored yields 0.
+// 
+#[allow(dead_code)]
+pub struct MessageTail {   // Placed after payload
+	// first 64 bit block
+	pub magic: [u8; 4],
+	pub time_s: u32,
+
+	// second 64 bit block
+	pub network_info: u32,
+	pub origin_id: u8,
+	pub origin_4ms: u8,
+	pub crc_payload: u16,
+
+	// third 64 bit block
+	pub rand: u64,			// random part for generate random hash
+}
+
 // The message header is watermarked and as such should be of length n*128 bits aka 16 Bytes
 // and n >= 3.
 #[allow(dead_code)]
