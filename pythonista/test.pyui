@@ -1,0 +1,56 @@
+[
+  {
+    "nodes" : [
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{0, 0}, {540, 534}}",
+        "class" : "TableView",
+        "attributes" : {
+          "flex" : "WH",
+          "data_source_items" : "Row 1\nRow 2\nRow 3",
+          "background_color" : "RGBA(1.0, 1.0, 1.0, 1.0)",
+          "frame" : "{{119, 113}, {200, 200}}",
+          "uuid" : "AF27D7DE-B467-46D2-8C9A-2ADD0550A4BF",
+          "data_source_number_of_lines" : 1,
+          "class" : "TableView",
+          "data_source_delete_enabled" : false,
+          "data_source_font_size" : 16,
+          "name" : "tableview1",
+          "row_height" : 35
+        },
+        "selected" : false
+      },
+      {
+        "nodes" : [
+
+        ],
+        "frame" : "{{485, 0}, {55, 36}}",
+        "class" : "Button",
+        "attributes" : {
+          "action" : "probe",
+          "name" : "button1",
+          "frame" : "{{179, 197}, {80, 32}}",
+          "title" : "Button",
+          "uuid" : "69FC9321-212D-4A47-A8D3-6908C5DA3E58",
+          "class" : "Button",
+          "font_size" : 15,
+          "image_name" : "iob:arrow_swap_256"
+        },
+        "selected" : false
+      }
+    ],
+    "frame" : "{{0, 0}, {540, 540}}",
+    "class" : "View",
+    "attributes" : {
+      "border_color" : "RGBA(0.000000,0.000000,0.000000,1.000000)",
+      "enabled" : true,
+      "background_color" : "RGBA(1.000000,1.000000,1.000000,1.000000)",
+      "name" : "Probe",
+      "tint_color" : "RGBA(0.000000,0.478000,1.000000,1.000000)",
+      "flex" : ""
+    },
+    "selected" : false
+  }
+]
